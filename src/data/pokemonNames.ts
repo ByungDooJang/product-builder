@@ -52,6 +52,36 @@ export const pokemonNameMap: Record<string, string> = {
   "타부자고": "gholdengo", "테라파고스": "terapagos", "굽이치는물결": "walking-wake",
 };
 
+export const moveNameMap: Record<string, string> = {
+  "10만볼트": "thunderbolt",
+  "번개": "thunder",
+  "하이드로펌프": "hydro-pump",
+  "파도타기": "surf",
+  "화염방사": "flamethrower",
+  "불대문자": "fire-blast",
+  "냉동빔": "ice-beam",
+  "눈보라": "blizzard",
+  "지진": "earthquake",
+  "스톤샤워": "stone-slide",
+  "인파이트": "close-combat",
+  "용의파동": "dragon-pulse",
+  "용성군": "draco-meteor",
+  "문포스": "moonblast",
+  "섀도볼": "shadow-ball",
+  "오물폭탄": "sludge-bomb",
+  "에너지볼": "energy-ball",
+  "사이코키네시스": "psychic",
+  "플레어드라이브": "flare-blitz",
+  "아쿠아브레이크": "liquidation",
+  "아이언헤드": "iron-head",
+  "치근거리기": "play-rough",
+  "탁쳐서떨구기": "knock-off",
+  "유턴": "u-turn",
+  "골드러시": "make-it-rain",
+  "덩굴방망이": "ivy-cudgel",
+  "테라버스트": "tera-blast",
+};
+
 export const getEnglishName = (koName: string): string => {
   return pokemonNameMap[koName] || koName.toLowerCase();
 };

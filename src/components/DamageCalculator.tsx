@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Swords, ChevronLeft, Shield, Target, Search, Loader2, History, CloudSun, Zap as TerrainIcon, HelpCircle, X } from 'lucide-react';
+import { Swords, ChevronLeft, Shield, Target, Search, Loader2, History, CloudSun, Zap as TerrainIcon, HelpCircle, X, ShoppingBag } from 'lucide-react';
 import axios from 'axios';
-import { pokemonNameMap } from '../data/pokemonNames';
+import { pokemonNameMap, moveNameMap } from '../data/pokemonNames';
 
 interface DamageCalculatorProps {
   onBack: () => void;
@@ -25,7 +25,9 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   const [atkRank, setAtkRank] = useState<number>(0);
   const [defRank, setDefRank] = useState<number>(0);
 
-  // Weather & Terrain
+  // Advanced Modifiers
+  const [item, setItem] = useState<string>('none');
+  const [ability, setAbility] = useState<string>('none');
   const [weather, setWeather] = useState<'none' | 'sun' | 'rain' | 'sand' | 'snow'>('none');
   const [terrain, setTerrain] = useState<'none' | 'electric' | 'grassy' | 'psychic' | 'misty'>('none');
   const [moveType, setMoveType] = useState<string>('Normal');
@@ -48,8 +50,16 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
 
   const calculateDamage = (random: number) => {
     const getRankMult = (r: number) => r >= 0 ? (2 + r) / 2 : 2 / (2 - r);
-    const finalAtk = attack * getRankMult(atkRank);
-    const finalDef = defense * getRankMult(defRank);
+    let finalAtk = attack * getRankMult(atkRank);
+    let finalDef = defense * getRankMult(defRank);
+
+    // Item/Ability modifiers
+    if (item === 'life-orb') finalAtk *= 1.3;
+    if (item === 'choice-band' || item === 'choice-specs') finalAtk *= 1.5;
+    if (item === 'expert-belt' && typeEffectiveness > 1) finalAtk *= 1.2;
+    if (item === 'assault-vest') finalDef *= 1.5;
+    if (ability === 'guts') finalAtk *= 1.5;
+    if (ability === 'huge-power') finalAtk *= 2.0;
 
     let baseDamage = (((2 * level / 5 + 2) * power * finalAtk / finalDef) / 50 + 2);
     if ((weather === 'sun' && moveType === 'Fire') || (weather === 'rain' && moveType === 'Water')) baseDamage *= 1.5;
@@ -79,10 +89,12 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   const fetchSuggestions = async (term: string) => {
     if (term.length < 1) { setSuggestions([]); return; }
     if (activeSearch === 'move') {
+       const koMoveMatches = Object.entries(moveNameMap).filter(([ko]) => ko.includes(term)).map(([ko, en]) => ({ name: en, koName: ko }));
        try {
           const res = await axios.get('https://pokeapi.co/api/v2/move?limit=1000');
-          const matches = res.data.results.filter((m: any) => m.name.toLowerCase().includes(term.toLowerCase())).slice(0, 5);
-          setSuggestions(matches);
+          const enMatches = res.data.results.filter((m: any) => m.name.toLowerCase().includes(term.toLowerCase())).map((m: any) => ({ name: m.name }));
+          const combined = [...koMoveMatches, ...enMatches].slice(0, 5);
+          setSuggestions(combined);
        } catch (e) {}
        return;
     }
@@ -103,16 +115,16 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
     return () => clearTimeout(timer);
   }, [attackerSearch, defenderSearch, moveSearch, activeSearch]);
 
-  const selectMove = async (name: string) => {
+  const selectMove = async (p: any) => {
     setIsSearching('move');
     setActiveSearch(null);
-    setMoveSearch(name);
+    setMoveSearch(p.koName || p.name);
     try {
-      const res = await axios.get(`https://pokeapi.co/api/v2/move/${name}`);
+      const res = await axios.get(`https://pokeapi.co/api/v2/move/${p.name.toLowerCase().replace(/ /g, '-')}`);
       if (res.data.power) setPower(res.data.power);
       const type = res.data.type.name.charAt(0).toUpperCase() + res.data.type.name.slice(1);
       setMoveType(type);
-    } catch (e) { alert('실패'); }
+    } catch (e) { alert('기술 로딩 실패'); }
     finally { setIsSearching(null); }
   };
 
@@ -155,11 +167,13 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
 
       {showNatureRef && (
          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl p-8 w-full max-w-lg border-8 border-poke-red">
-               <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-black text-poke-dark uppercase italic">성격표</h3><button onClick={() => setShowNatureRef(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button></div>
+            <div className="bg-white rounded-3xl p-8 w-full max-w-lg border-8 border-poke-red shadow-2xl">
+               <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-black text-poke-dark uppercase italic tracking-tighter underline decoration-poke-yellow decoration-4">성격 일람표</h3><button onClick={() => setShowNatureRef(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button></div>
                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="bg-blue-50 p-3 rounded-xl border border-blue-100"><p className="font-black text-blue-600 mb-2">스피드 +</p><p>겁쟁이, 명랑, 성급, 천진난만</p></div>
-                  <div className="bg-red-50 p-3 rounded-xl border border-red-100"><p className="font-black text-red-600 mb-2">화력 +</p><p>고집, 조심, 용감, 냉정</p></div>
+                  <div className="bg-blue-50 p-3 rounded-xl border-2 border-blue-100"><p className="font-black text-blue-600 mb-2 italic">스피드 상승</p><p className="font-bold">겁쟁이 (Timid), 명랑 (Jolly)</p></div>
+                  <div className="bg-red-50 p-3 rounded-xl border-2 border-red-100"><p className="font-black text-red-600 mb-2 italic">공격/특공 상승</p><p className="font-bold">고집 (Adamant), 조심 (Modest)</p></div>
+                  <div className="bg-green-50 p-3 rounded-xl border-2 border-green-100"><p className="font-black text-green-600 mb-2 italic">방어/특방 상승</p><p className="font-bold">장난꾸러기 (Impish), 신중 (Careful)</p></div>
+                  <div className="bg-yellow-50 p-3 rounded-xl border-2 border-yellow-100"><p className="font-black text-yellow-600 mb-2 italic">스피드 하락</p><p className="font-bold">용감 (Brave), 냉정 (Quiet)</p></div>
                </div>
             </div>
          </div>
@@ -168,10 +182,10 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
       <div className="bg-white rounded-3xl p-8 border-8 border-poke-blue shadow-[0_12px_0_0_rgba(59,76,202,1)] text-poke-dark">
         <div className="flex items-center justify-between mb-8 border-b-4 border-gray-100 pb-4">
           <div className="flex items-center gap-4">
-            <div className="bg-poke-blue p-3 rounded-2xl text-white shadow-lg"><Swords size={32} /></div>
-            <div><h2 className="text-3xl font-black uppercase tracking-tighter">데미지 시뮬레이터</h2><p className="text-gray-500 font-bold italic">Elite Battle Simulator Active!</p></div>
+            <div className="bg-poke-blue p-3 rounded-2xl text-white shadow-lg animate-pulse"><Swords size={32} /></div>
+            <div><h2 className="text-3xl font-black uppercase tracking-tighter">데미지 계산기</h2><p className="text-gray-500 font-bold italic">Pro Presets & Move Mapping Active!</p></div>
           </div>
-          <button onClick={() => setShowNatureRef(true)} className="p-2 bg-gray-100 text-gray-400 hover:text-poke-blue rounded-full transition-colors"><HelpCircle size={24} /></button>
+          <button onClick={() => setShowNatureRef(true)} className="p-2 bg-gray-100 text-gray-400 hover:text-poke-blue rounded-full transition-all hover:rotate-12"><HelpCircle size={24} /></button>
         </div>
 
         <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-6 mb-8 border-2 border-gray-100 shadow-inner relative overflow-hidden">
@@ -193,21 +207,20 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
            <div className="relative">
-              <label className="text-[10px] font-black uppercase text-gray-400 mb-1 block italic underline">기술 검색 (EN)</label>
+              <label className="text-[10px] font-black uppercase text-gray-400 mb-1 block italic underline">기술 검색 (한글/EN)</label>
               <div className="relative">
                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
-                 <input type="text" placeholder="예: Thunderbolt..." value={moveSearch} onFocus={() => setActiveSearch('move')} onChange={(e) => setMoveSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 pl-9 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
+                 <input type="text" placeholder="예: 10만볼트, Surf..." value={moveSearch} onFocus={() => setActiveSearch('move')} onChange={(e) => setMoveSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 pl-9 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
                  {isSearching === 'move' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-poke-blue" size={14} />}
               </div>
               {activeSearch === 'move' && suggestions.length > 0 && (
                 <div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">
-                  {suggestions.map(m => (<button key={m.name} onClick={() => selectMove(m.name)} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] border-b border-gray-50">{m.name}</button>))}
+                  {suggestions.map(p => (<button key={p.name} onClick={() => selectMove(p)} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between border-b border-gray-50"><span>{p.koName || p.name}</span><span className="text-gray-300">{p.name}</span></button>))}
                 </div>
               )}
            </div>
            <div className="relative"><label className="text-[10px] font-black uppercase text-gray-400 mb-1 block italic underline">공격 포켓몬</label><div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} /><input type="text" placeholder="검색..." value={attackerSearch} onFocus={() => setActiveSearch('attacker')} onChange={(e) => setAttackerSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 pl-9 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
-              {isSearching === 'attacker' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-poke-blue" size={14} />}
            </div>
            {activeSearch === 'attacker' && suggestions.length > 0 && (
               <div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">
@@ -216,7 +229,6 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
            )}</div>
            <div className="relative"><label className="text-[10px] font-black uppercase text-gray-400 mb-1 block italic underline">방어 포켓몬</label><div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} /><input type="text" placeholder="검색..." value={defenderSearch} onFocus={() => setActiveSearch('defender')} onChange={(e) => setDefenderSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 pl-9 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
-              {isSearching === 'defender' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-poke-blue" size={14} />}
            </div>
            {activeSearch === 'defender' && suggestions.length > 0 && (
               <div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">
@@ -233,8 +245,12 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
                 <div><label className="block text-[10px] font-black uppercase mb-1 text-red-500 underline italic">방어 HP</label><input type="number" value={maxHp} onChange={(e) => setMaxHp(Number(e.target.value))} className="w-full bg-red-50 p-2 rounded-xl font-bold text-xs border border-red-100" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                 <div><label className="block text-[10px] font-black uppercase mb-1">공격 수치</label><input type="number" value={attack} onChange={(e) => setAttack(Number(e.target.value))} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs" /></div>
-                 <div><label className="block text-[10px] font-black uppercase mb-1">방어 수치</label><input type="number" value={defense} onChange={(e) => setDefense(Number(e.target.value))} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs" /></div>
+                 <div><label className="block text-[10px] font-black uppercase mb-1 flex items-center gap-1"><ShoppingBag size={10} /> 도구(Item)</label><select value={item} onChange={(e) => setItem(e.target.value)} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs">
+                    <option value="none">없음</option><option value="life-orb">생명의구슬 (x1.3)</option><option value="choice-band">구애머리띠 (x1.5)</option><option value="choice-specs">구애안경 (x1.5)</option><option value="expert-belt">달인의띠 (x1.2)</option><option value="assault-vest">돌격조끼 (특방x1.5)</option>
+                 </select></div>
+                 <div><label className="block text-[10px] font-black uppercase mb-1">특성(Ability)</label><select value={ability} onChange={(e) => setAbility(e.target.value)} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs">
+                    <option value="none">없음</option><option value="huge-power">천하장사 (x2.0)</option><option value="guts">근성 (x1.5)</option>
+                 </select></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                  <div><label className="block text-[10px] font-black uppercase mb-1 text-blue-500">공격 랭크</label><select value={atkRank} onChange={(e) => setAtkRank(Number(e.target.value))} className="w-full bg-blue-50 p-2 rounded-xl font-bold text-xs">{[6,5,4,3,2,1,0,-1,-2,-3,-4,-5,-6].map(r => <option key={r} value={r}>{r > 0 ? `+${r}` : r}</option>)}</select></div>
@@ -257,12 +273,12 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
           </div>
 
           <div className="lg:col-span-4 flex flex-col gap-4">
-            <div className="bg-poke-dark rounded-2xl p-6 text-white text-center shadow-inner relative overflow-hidden">
-              <p className="text-[10px] font-black uppercase text-poke-yellow mb-2 tracking-widest italic underline decoration-poke-red">Damage Simulator</p>
+            <div className="bg-poke-dark rounded-2xl p-6 text-white text-center shadow-inner relative overflow-hidden border-2 border-white/5">
+              <p className="text-[10px] font-black uppercase text-poke-yellow mb-2 tracking-widest italic">Damage Result</p>
               <div className="text-3xl font-black italic mb-1 z-10 relative">{minDamage} ~ {maxDamage}</div>
-              <p className="text-[10px] font-black text-poke-red mb-3 animate-pulse">{getKOTurns()}</p>
+              <p className="text-[10px] font-black text-poke-red mb-3 animate-pulse uppercase">{getKOTurns()}</p>
               <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden relative z-10"><div className="h-full bg-gradient-to-r from-red-500 to-green-500" style={{ width: `${maxPercent}%` }}></div></div>
-              <p className="text-[9px] font-bold text-gray-400 mt-2 italic">{minPercent}% ~ {maxPercent}%</p>
+              <p className="text-[9px] font-bold text-gray-400 mt-2 italic">{minPercent}% ~ {maxPercent}% dealt</p>
             </div>
             <div className="bg-gray-50 rounded-2xl p-4 border-2 border-dashed border-gray-200 overflow-y-auto max-h-[140px]"><h3 className="text-[10px] font-black uppercase text-gray-400 mb-2 flex items-center gap-2"><History size={12} /> Recent</h3>
               <div className="space-y-1">{history.map(item => (<div key={item.id} className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center"><div className="text-[8px] font-bold capitalize"><span className="text-poke-blue">{item.attacker}</span> vs <span className="text-poke-red">{item.defender}</span></div><div className="text-[8px] font-black">{item.min}-{item.max}</div></div>))}</div>
