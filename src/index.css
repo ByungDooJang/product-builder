@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+  --color-poke-yellow: #FFCB05;
+  --color-poke-red: #EE1515;
+  --color-poke-blue: #3B4CCA;
+  --color-poke-dark: #222222;
+}
+
+body {
+  @apply bg-poke-dark text-white min-h-screen font-sans;
+}
