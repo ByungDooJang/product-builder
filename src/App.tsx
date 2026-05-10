@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List, Grid3X3, Grid, ShieldAlert, ShoppingBag, Thermometer } from 'lucide-react';
+import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List, Grid3X3, Grid, ShieldAlert, ShoppingBag, Thermometer, Wind } from 'lucide-react';
 import { usageStats } from './data/usageStats';
 import { pokemonNameMap } from './data/pokemonNames';
 
@@ -18,8 +18,9 @@ const CoverageHeatmap = lazy(() => import('./components/CoverageHeatmap'));
 const BattleMatrix = lazy(() => import('./components/BattleMatrix'));
 const StatusMaster = lazy(() => import('./components/StatusMaster'));
 const ItemGuide = lazy(() => import('./components/ItemGuide'));
+const SpeedControlMaster = lazy(() => import('./components/SpeedControlMaster'));
 
-type View = 'home' | 'mbti' | 'speed' | 'damage' | 'matchup' | 'coverage' | 'tiers' | 'priority' | 'counter' | 'settings' | 'log' | 'partnership' | 'heatmap' | 'matrix' | 'status' | 'items';
+type View = 'home' | 'mbti' | 'speed' | 'damage' | 'matchup' | 'coverage' | 'tiers' | 'priority' | 'counter' | 'settings' | 'log' | 'partnership' | 'heatmap' | 'matrix' | 'status' | 'items' | 'control';
 
 const themes: Record<string, any> = {
   pikachu: { bg: '#222222' },
@@ -30,9 +31,10 @@ const themes: Record<string, any> = {
 
 const tips = [
   "더블 배틀에서는 '도움말' 기술로 아군의 데미지를 1.5배 올릴 수 있습니다.",
+  "순풍은 4턴 동안 아군 전체의 스피드를 2배로 만듭니다.",
+  "트릭룸 상태에서는 스피드가 낮은 포켓몬이 먼저 행동합니다.",
   "랭크 변화(+1)는 해당 능력치를 1.5배로 만듭니다.",
   "테라스탈을 활용해 약점을 지우고 기습적인 카운터를 날려보세요.",
-  "필드 효과는 5턴간 유지되며, 다른 필드가 깔리면 덮어씌워집니다.",
 ];
 
 const App: React.FC = () => {
@@ -95,6 +97,7 @@ const App: React.FC = () => {
             case 'matrix': return <BattleMatrix onBack={() => setView('home')} />;
             case 'status': return <StatusMaster onBack={() => setView('home')} />;
             case 'items': return <ItemGuide onBack={() => setView('home')} />;
+            case 'control': return <SpeedControlMaster onBack={() => setView('home')} />;
             default:
               return (
                 <div className="w-full max-w-7xl animate-in fade-in duration-500 pb-20">
@@ -102,32 +105,37 @@ const App: React.FC = () => {
                     <div className="lg:col-span-8 space-y-6">
                        <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-6 flex items-start gap-4 shadow-xl">
                           <div className="bg-poke-yellow p-3 rounded-2xl text-poke-dark shadow-lg shrink-0"><Info size={24} /></div>
-                          <div><h3 className="text-sm font-black uppercase text-poke-yellow mb-1 italic">World Champion Tip</h3><p className="text-lg font-bold text-gray-200 leading-snug">"{tips[tipIndex]}"</p></div>
+                          <div><h3 className="text-sm font-black uppercase text-poke-yellow mb-1 italic">Master of Masters Tip</h3><p className="text-lg font-bold text-gray-200 leading-snug">"{tips[tipIndex]}"</p></div>
                        </div>
                        <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-6 shadow-xl">
-                          <h3 className="text-xs font-black uppercase text-poke-red mb-4 italic tracking-widest"><TrendingUp size={16}/> Global Usage Stats</h3>
+                          <h3 className="text-xs font-black uppercase text-poke-red mb-4 italic tracking-widest"><TrendingUp size={16}/> Series 19 Global Meta</h3>
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                              {usageStats.slice(0, 5).map(p => (<div key={p.rank} className="bg-poke-dark/50 p-2 rounded-xl border border-white/5 flex flex-col items-center"><span className="text-[8px] font-black text-poke-yellow uppercase">Rank {p.rank}</span><span className="text-[10px] font-bold text-white truncate w-full text-center">{p.koName}</span></div>))}
                           </div>
                        </div>
                     </div>
                     <div className="lg:col-span-4 bg-gradient-to-br from-poke-red/20 to-poke-red/5 border-2 border-poke-red/20 rounded-3xl p-6 flex flex-col justify-center items-center text-center shadow-xl relative overflow-hidden group cursor-pointer" onClick={() => handleNav('log')}>
-                      <Trophy className="text-poke-red mb-2 group-hover:scale-110 transition-transform" size={48} /><h3 className="text-xs font-black uppercase text-poke-red tracking-widest">나의 승전보</h3><p className="font-black text-3xl text-white italic leading-none mt-1 uppercase">Champion Logs</p>
+                      <Trophy className="text-poke-red mb-2 group-hover:scale-110 transition-transform" size={48} /><h3 className="text-xs font-black uppercase text-poke-red tracking-widest">그랜드 마스터 로그</h3><p className="font-black text-3xl text-white italic leading-none mt-1 uppercase">Hall of Fame</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+                  {/* Master 4x4 Grid (16 tools) */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-6">
                     <MenuButton onClick={() => handleNav('mbti')} icon="🐾" title="성향 테스트" color="border-poke-yellow" label="MBTI" />
                     <MenuButton onClick={() => handleNav('speed')} icon="⚡" title="스피드 계산" color="border-poke-red" label="SPEED" />
                     <MenuButton onClick={() => handleNav('damage')} icon="⚔️" title="데미지 시뮬" color="border-poke-blue" label="DAMAGE" />
                     <MenuButton onClick={() => handleNav('matrix')} icon="🥊" title="배틀 매트릭스" color="border-red-500" label="MATRIX" />
+                    
                     <MenuButton onClick={() => handleNav('matchup')} icon="🛡️" title="타입 상성" color="border-green-500" label="TYPES" />
                     <MenuButton onClick={() => handleNav('coverage')} icon="📊" title="파티 분석" color="border-purple-500" label="TEAM" />
                     <MenuButton onClick={() => handleNav('tiers')} icon="🏁" title="스피드 티어" color="border-orange-500" label="TIERS" />
                     <MenuButton onClick={() => handleNav('heatmap')} icon="🗺️" title="견제 분석" color="border-orange-400" label="HEATMAP" />
+                    
                     <MenuButton onClick={() => handleNav('partnership')} icon="🤝" title="팀 빌딩" color="border-indigo-500" label="PARTNER" />
+                    <MenuButton onClick={() => handleNav('control')} icon={<Wind/>} title="스피드 조절" color="border-cyan-400" label="CONTROL" />
                     <MenuButton onClick={() => handleNav('priority')} icon="🚀" title="우선도 가이드" color="border-cyan-500" label="PRIORITY" />
                     <MenuButton onClick={() => handleNav('counter')} icon="🎯" title="카운터 분석" color="border-pink-500" label="COUNTER" />
+                    
                     <MenuButton onClick={() => handleNav('status')} icon={<Thermometer />} title="상태 이상" color="border-red-400" label="STATUS" />
                     <MenuButton onClick={() => handleNav('items')} icon={<ShoppingBag />} title="도구 백과" color="border-indigo-400" label="ITEMS" />
                     <MenuButton onClick={() => handleNav('log')} icon="📝" title="배틀 로그" color="border-blue-400" label="LOGS" />
@@ -153,8 +161,8 @@ const App: React.FC = () => {
             <h1 className="text-xl md:text-2xl font-black text-white tracking-tighter uppercase italic text-stroke-sm">Pokémon Champions</h1>
           </div>
           <div className="flex items-center gap-2">
-             <button onClick={() => setShowQuickSearch(true)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all"><Search size={18} /></button>
-             <button onClick={() => handleNav('settings')} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all"><Settings size={18} /></button>
+             <button onClick={() => setShowQuickSearch(true)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all shadow-lg"><Search size={18} /></button>
+             <button onClick={() => handleNav('settings')} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all shadow-lg"><Settings size={18} /></button>
           </div>
         </div>
       </header>
@@ -178,13 +186,13 @@ const App: React.FC = () => {
 
       <nav className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-lg border-t-4 border-poke-dark flex justify-around items-center p-3 z-50 md:hidden shadow-2xl">
         <NavButton icon={<Home />} label="홈" active={view === 'home'} onClick={() => handleNav('home')} />
-        <NavButton icon={<Zap />} label="도구" active={view === 'speed' || view === 'damage' || view === 'matrix'} onClick={() => handleNav('speed')} />
+        <NavButton icon={<Zap />} label="도구" active={view === 'speed' || view === 'damage' || view === 'matrix' || view === 'control'} onClick={() => handleNav('speed')} />
         <NavButton icon={<Star />} label="분석" active={view === 'coverage' || view === 'partnership' || view === 'heatmap'} onClick={() => handleNav('coverage')} />
         <NavButton icon={<Trophy />} label="로그" active={view === 'log'} onClick={() => handleNav('log')} />
       </nav>
 
       <footer className="bg-poke-dark p-6 text-center border-t-2 border-white/10 pb-24 md:pb-6">
-        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest">Pokémon Champions v11.0 World Champion Edition</p>
+        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest italic tracking-[0.2em]">Pokémon Champions v12.0 Master of Masters</p>
       </footer>
     </div>
   );
