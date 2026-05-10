@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import SpeedCalculator from './components/SpeedCalculator';
+import TrainerTest from './components/TrainerTest';
 
 type View = 'home' | 'mbti' | 'speed';
 
@@ -11,18 +12,7 @@ const App: React.FC = () => {
       case 'speed':
         return <SpeedCalculator onBack={() => setView('home')} />;
       case 'mbti':
-        return (
-          <div className="text-center bg-white p-12 rounded-3xl border-8 border-poke-yellow text-poke-dark shadow-[0_10px_0_0_rgba(255,203,5,1)]">
-            <h2 className="text-3xl font-black mb-4 uppercase">성향 테스트 준비 중!</h2>
-            <p className="font-bold text-gray-500 mb-8">당신의 트레이너 성향을 분석하는 알고리즘을 로딩 중입니다.</p>
-            <button 
-              onClick={() => setView('home')}
-              className="px-8 py-3 bg-poke-dark text-white font-black rounded-full uppercase italic hover:scale-105 transition-transform"
-            >
-              홈으로 돌아가기
-            </button>
-          </div>
-        );
+        return <TrainerTest onBack={() => setView('home')} />;
       default:
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
@@ -100,4 +90,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
