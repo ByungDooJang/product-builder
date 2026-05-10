@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List } from 'lucide-react';
+import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List, Grid3X3 } from 'lucide-react';
 import { usageStats } from './data/usageStats';
 import { pokemonNameMap } from './data/pokemonNames';
 
@@ -14,8 +14,9 @@ const CounterChecker = lazy(() => import('./components/CounterChecker'));
 const SettingsTool = lazy(() => import('./components/SettingsTool'));
 const BattleLog = lazy(() => import('./components/BattleLog'));
 const PartnershipSuggester = lazy(() => import('./components/PartnershipSuggester'));
+const CoverageHeatmap = lazy(() => import('./components/CoverageHeatmap'));
 
-type View = 'home' | 'mbti' | 'speed' | 'damage' | 'matchup' | 'coverage' | 'tiers' | 'priority' | 'counter' | 'settings' | 'log' | 'partnership';
+type View = 'home' | 'mbti' | 'speed' | 'damage' | 'matchup' | 'coverage' | 'tiers' | 'priority' | 'counter' | 'settings' | 'log' | 'partnership' | 'heatmap';
 
 const themes: Record<string, any> = {
   pikachu: { bg: '#222222' },
@@ -88,6 +89,7 @@ const App: React.FC = () => {
             case 'settings': return <SettingsTool onBack={() => setView('home')} onThemeChange={handleThemeChange} currentTheme={themeId} />;
             case 'log': return <BattleLog onBack={() => setView('home')} />;
             case 'partnership': return <PartnershipSuggester onBack={() => setView('home')} />;
+            case 'heatmap': return <CoverageHeatmap onBack={() => setView('home')} />;
             default:
               return (
                 <div className="w-full max-w-7xl animate-in fade-in duration-500 pb-20">
@@ -109,19 +111,19 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-6">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4 md:gap-6">
                     <MenuButton onClick={() => handleNav('mbti')} icon="🐾" title="성향 테스트" color="border-poke-yellow" label="MBTI" />
                     <MenuButton onClick={() => handleNav('speed')} icon="⚡" title="스피드 계산" color="border-poke-red" label="SPEED" />
                     <MenuButton onClick={() => handleNav('damage')} icon="⚔️" title="데미지 시뮬" color="border-poke-blue" label="DAMAGE" />
                     <MenuButton onClick={() => handleNav('matchup')} icon="🛡️" title="타입 상성" color="border-green-500" label="TYPES" />
                     <MenuButton onClick={() => handleNav('coverage')} icon="📊" title="파티 분석" color="border-purple-500" label="TEAM" />
                     <MenuButton onClick={() => handleNav('tiers')} icon="🏁" title="스피드 티어" color="border-orange-500" label="TIERS" />
+                    <MenuButton onClick={() => handleNav('heatmap')} icon="🗺️" title="견제 분석" color="border-orange-400" label="HEATMAP" />
                     <MenuButton onClick={() => handleNav('partnership')} icon="🤝" title="팀 빌딩" color="border-indigo-500" label="PARTNER" />
                     <MenuButton onClick={() => handleNav('priority')} icon="🚀" title="우선도 가이드" color="border-cyan-500" label="PRIORITY" />
                     <MenuButton onClick={() => handleNav('counter')} icon="🎯" title="카운터 분석" color="border-pink-500" label="COUNTER" />
                     <MenuButton onClick={() => handleNav('log')} icon="📝" title="배틀 로그" color="border-blue-400" label="LOGS" />
                     <MenuButton onClick={() => handleNav('settings')} icon="⚙️" title="설정 및 테마" color="border-gray-500" label="CONFIG" />
-                    <div className="bg-white/5 border-2 border-dashed border-white/10 rounded-3xl flex items-center justify-center text-gray-500 font-black uppercase italic text-[9px] text-center p-4">Final Tool Coming Soon</div>
                   </div>
                 </div>
               );
@@ -169,12 +171,12 @@ const App: React.FC = () => {
       <nav className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur-lg border-t-4 border-poke-dark flex justify-around items-center p-3 z-50 md:hidden shadow-2xl">
         <NavButton icon={<Home />} label="홈" active={view === 'home'} onClick={() => handleNav('home')} />
         <NavButton icon={<Zap />} label="도구" active={view === 'speed' || view === 'damage'} onClick={() => handleNav('speed')} />
-        <NavButton icon={<Star />} label="분석" active={view === 'coverage' || view === 'partnership'} onClick={() => handleNav('coverage')} />
+        <NavButton icon={<Star />} label="분석" active={view === 'coverage' || view === 'partnership' || view === 'heatmap'} onClick={() => handleNav('coverage')} />
         <NavButton icon={<Trophy />} label="로그" active={view === 'log'} onClick={() => handleNav('log')} />
       </nav>
 
       <footer className="bg-poke-dark p-6 text-center border-t-2 border-white/10 pb-24 md:pb-6">
-        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest">Pokémon Champions v8.0 Global Pro Edition</p>
+        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest">Pokémon Champions v9.0 Ultimate Master</p>
       </footer>
     </div>
   );
