@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, ChevronLeft, Search, Loader2 } from 'lucide-react';
 import axios from 'axios';
+import { pokemonNameMap } from '../data/pokemonNames';
 
 interface SpeedCalculatorProps {
   onBack: () => void;
@@ -8,7 +9,7 @@ interface SpeedCalculatorProps {
 
 interface PokemonData {
   name: string;
-  url: string;
+  koName?: string;
 }
 
 const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
@@ -36,17 +37,33 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
   // Search for Pokémon
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (searchTerm.length < 2) {
+      if (searchTerm.length < 1) {
         setSuggestions([]);
         return;
       }
+
+      // Check for Korean matches first
+      const koMatches = Object.entries(pokemonNameMap)
+        .filter(([ko]) => ko.includes(searchTerm))
+        .map(([ko, en]) => ({ name: en, koName: ko }));
+
       try {
-        // Fetch all pokemon names (cached or limited)
         const response = await axios.get('https://pokeapi.co/api/v2/pokemon?limit=1000');
-        const matches = response.data.results.filter((p: PokemonData) => 
-          p.name.toLowerCase().includes(searchTerm.toLowerCase())
-        ).slice(0, 5);
-        setSuggestions(matches);
+        const enMatches = response.data.results
+          .filter((p: any) => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+          .map((p: any) => ({ name: p.name }));
+        
+        // Combine and de-duplicate by name
+        const combinedMap = new Map();
+        [...koMatches, ...enMatches].forEach(p => {
+          if (!combinedMap.has(p.name)) {
+            combinedMap.set(p.name, p);
+          } else if (p.koName) {
+            combinedMap.set(p.name, p); // Prefer Korean version
+          }
+        });
+
+        setSuggestions(Array.from(combinedMap.values()).slice(0, 6));
       } catch (error) {
         console.error('Error fetching suggestions', error);
       }
@@ -56,18 +73,18 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const selectPokemon = async (name: string) => {
+  const selectPokemon = async (p: PokemonData) => {
     setIsSearching(true);
-    setSearchTerm(name);
+    setSearchTerm(p.koName || p.name);
     setShowSuggestions(false);
     try {
-      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${name}`);
+      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${p.name}`);
       const speedStat = response.data.stats.find((s: any) => s.stat.name === 'speed');
       if (speedStat) {
         setBaseSpeed(speedStat.base_stat);
       }
     } catch (error) {
-      alert('포켓몬 정보를 가져오는데 실패했습니다.');
+      alert('데이터 로딩 실패');
     } finally {
       setIsSearching(false);
     }
@@ -95,12 +112,12 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
 
         {/* Search Bar */}
         <div className="mb-8 relative">
-          <label className="block text-sm font-black uppercase mb-1">포켓몬 검색 (English)</label>
+          <label className="block text-sm font-black uppercase mb-1">포켓몬 검색 (한글/English)</label>
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input 
               type="text" 
-              placeholder="예: Pikachu, Garchomp..." 
+              placeholder="예: 피카츄, 한카리아스, Garchomp..." 
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -119,10 +136,11 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
               {suggestions.map((p) => (
                 <button
                   key={p.name}
-                  onClick={() => selectPokemon(p.name)}
-                  className="w-full p-4 text-left hover:bg-gray-50 font-bold capitalize border-b last:border-none border-gray-100"
+                  onClick={() => selectPokemon(p)}
+                  className="w-full p-4 text-left hover:bg-gray-50 font-bold capitalize border-b last:border-none border-gray-100 flex justify-between"
                 >
-                  {p.name}
+                  <span>{p.koName || p.name}</span>
+                  {p.koName && <span className="text-gray-400 text-xs uppercase">{p.name}</span>}
                 </button>
               ))}
             </div>
@@ -141,7 +159,6 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
                 className="w-full bg-gray-100 border-4 border-transparent focus:border-poke-red outline-none p-3 rounded-xl font-bold transition-all"
               />
             </div>
-...
             
             <div className="grid grid-cols-2 gap-4">
               <div>

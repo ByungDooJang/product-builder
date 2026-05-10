@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Swords, ChevronLeft, Shield, Target, Search, Loader2, History } from 'lucide-react';
 import axios from 'axios';
+import { pokemonNameMap } from '../data/pokemonNames';
 
 interface DamageCalculatorProps {
   onBack: () => void;
@@ -8,7 +9,7 @@ interface DamageCalculatorProps {
 
 interface PokemonData {
   name: string;
-  url: string;
+  koName?: string;
 }
 
 const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
@@ -47,16 +48,29 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   const maxDamage = calculateDamage(1.0);
 
   const fetchSuggestions = async (term: string) => {
-    if (term.length < 2) {
+    if (term.length < 1) {
       setSuggestions([]);
       return;
     }
+
+    // Check Korean mapping
+    const koMatches = Object.entries(pokemonNameMap)
+      .filter(([ko]) => ko.includes(term))
+      .map(([ko, en]) => ({ name: en, koName: ko }));
+
     try {
       const response = await axios.get('https://pokeapi.co/api/v2/pokemon?limit=1000');
-      const matches = response.data.results.filter((p: PokemonData) => 
-        p.name.toLowerCase().includes(term.toLowerCase())
-      ).slice(0, 5);
-      setSuggestions(matches);
+      const enMatches = response.data.results
+        .filter((p: any) => p.name.toLowerCase().includes(term.toLowerCase()))
+        .map((p: any) => ({ name: p.name }));
+      
+      const combinedMap = new Map();
+      [...koMatches, ...enMatches].forEach(p => {
+        if (!combinedMap.has(p.name)) combinedMap.set(p.name, p);
+        else if (p.koName) combinedMap.set(p.name, p);
+      });
+
+      setSuggestions(Array.from(combinedMap.values()).slice(0, 5));
     } catch (error) {
       console.error(error);
     }
@@ -64,23 +78,27 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
 
   useEffect(() => {
     const term = activeSearch === 'attacker' ? attackerSearch : defenderSearch;
+    if (!term) {
+      setSuggestions([]);
+      return;
+    }
     const timer = setTimeout(() => fetchSuggestions(term), 300);
     return () => clearTimeout(timer);
   }, [attackerSearch, defenderSearch, activeSearch]);
 
-  const selectPokemon = async (name: string, target: 'attacker' | 'defender') => {
+  const selectPokemon = async (p: PokemonData, target: 'attacker' | 'defender') => {
     setIsSearching(target);
     setActiveSearch(null);
-    if (target === 'attacker') setAttackerSearch(name);
-    else setDefenderSearch(name);
+    if (target === 'attacker') setAttackerSearch(p.koName || p.name);
+    else setDefenderSearch(p.koName || p.name);
 
     try {
-      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${name}`);
+      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${p.name}`);
       const stats = response.data.stats;
       if (target === 'attacker') {
         const atk = stats.find((s: any) => s.stat.name === 'attack')?.base_stat || 100;
         const spAtk = stats.find((s: any) => s.stat.name === 'special-attack')?.base_stat || 100;
-        setAttack(Math.max(atk, spAtk)); // Use higher of the two for simplicity
+        setAttack(Math.max(atk, spAtk));
       } else {
         const def = stats.find((s: any) => s.stat.name === 'defense')?.base_stat || 100;
         const spDef = stats.find((s: any) => s.stat.name === 'special-defense')?.base_stat || 100;
@@ -129,12 +147,12 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
         {/* Search Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <div className="relative">
-            <label className="text-xs font-black uppercase text-gray-400 mb-1 block">공격 포켓몬</label>
+            <label className="text-xs font-black uppercase text-gray-400 mb-1 block">공격 포켓몬 (한글/EN)</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
               <input 
                 type="text" 
-                placeholder="검색..."
+                placeholder="예: 피카츄, Pikachu..."
                 value={attackerSearch}
                 onFocus={() => setActiveSearch('attacker')}
                 onChange={(e) => setAttackerSearch(e.target.value)}
@@ -145,18 +163,21 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
             {activeSearch === 'attacker' && suggestions.length > 0 && (
               <div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">
                 {suggestions.map(p => (
-                  <button key={p.name} onClick={() => selectPokemon(p.name, 'attacker')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-sm">{p.name}</button>
+                  <button key={p.name} onClick={() => selectPokemon(p, 'attacker')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-sm flex justify-between">
+                    <span>{p.koName || p.name}</span>
+                    {p.koName && <span className="text-gray-300 text-[10px]">{p.name}</span>}
+                  </button>
                 ))}
               </div>
             )}
           </div>
           <div className="relative">
-            <label className="text-xs font-black uppercase text-gray-400 mb-1 block">방어 포켓몬</label>
+            <label className="text-xs font-black uppercase text-gray-400 mb-1 block">방어 포켓몬 (한글/EN)</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
               <input 
                 type="text" 
-                placeholder="검색..."
+                placeholder="예: 한카리아스, Garchomp..."
                 value={defenderSearch}
                 onFocus={() => setActiveSearch('defender')}
                 onChange={(e) => setDefenderSearch(e.target.value)}
@@ -167,7 +188,10 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
             {activeSearch === 'defender' && suggestions.length > 0 && (
               <div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">
                 {suggestions.map(p => (
-                  <button key={p.name} onClick={() => selectPokemon(p.name, 'defender')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-sm">{p.name}</button>
+                  <button key={p.name} onClick={() => selectPokemon(p, 'defender')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-sm flex justify-between">
+                    <span>{p.koName || p.name}</span>
+                    {p.koName && <span className="text-gray-300 text-[10px]">{p.name}</span>}
+                  </button>
                 ))}
               </div>
             )}
@@ -176,7 +200,6 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Stats Inputs */}
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -198,7 +221,6 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
               </div>
             </div>
 
-            {/* Modifiers */}
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-black uppercase mb-1 italic">상성 효과</label>
@@ -225,7 +247,6 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
             </div>
           </div>
 
-          {/* Result Area */}
           <div className="flex flex-col gap-4">
             <div className="bg-poke-dark rounded-2xl p-6 text-white text-center shadow-inner">
               <p className="text-[10px] font-black uppercase text-poke-yellow mb-2 tracking-widest">예상 데미지 범위</p>
@@ -235,7 +256,6 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
               </div>
             </div>
 
-            {/* History List */}
             <div className="bg-gray-50 rounded-2xl p-4 flex-grow border-2 border-dashed border-gray-200">
               <h3 className="text-[10px] font-black uppercase text-gray-400 mb-3 flex items-center gap-2">
                 <History size={12} /> 최근 계산 기록
@@ -260,4 +280,3 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
 };
 
 export default DamageCalculator;
-
