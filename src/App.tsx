@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List, Grid3X3, Grid, ShieldAlert, ShoppingBag, Thermometer, Wind } from 'lucide-react';
+import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List, Grid3X3, Grid, Clock } from 'lucide-react';
 import { usageStats } from './data/usageStats';
 import { pokemonNameMap } from './data/pokemonNames';
 
@@ -31,10 +31,10 @@ const themes: Record<string, any> = {
 
 const tips = [
   "더블 배틀에서는 '도움말' 기술로 아군의 데미지를 1.5배 올릴 수 있습니다.",
-  "순풍은 4턴 동안 아군 전체의 스피드를 2배로 만듭니다.",
-  "트릭룸 상태에서는 스피드가 낮은 포켓몬이 먼저 행동합니다.",
   "랭크 변화(+1)는 해당 능력치를 1.5배로 만듭니다.",
   "테라스탈을 활용해 약점을 지우고 기습적인 카운터를 날려보세요.",
+  "스피드 수치가 같은 경우 50%의 확률로 선공이 결정됩니다.",
+  "필드 효과는 5턴간 유지되며, 다른 필드가 깔리면 덮어씌워집니다.",
 ];
 
 const App: React.FC = () => {
@@ -44,10 +44,13 @@ const App: React.FC = () => {
   const [showQuickSearch, setShowQuickSearch] = useState(false);
   const [quickSearchTerm, setQuickSearchTerm] = useState('');
   const [qsResults, setQsResults] = useState<any[]>([]);
+  const [searchHistory, setSearchHistory] = useState<any[]>([]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('poke_theme_id');
     if (savedTheme) setThemeId(savedTheme);
+    const savedHistory = localStorage.getItem('global_search_history');
+    if (savedHistory) setSearchHistory(JSON.parse(savedHistory));
   }, []);
 
   const handleThemeChange = (id: string) => {
@@ -60,11 +63,18 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   }, [view]);
 
-  const handleQuickSearch = async (term: string) => {
+  const handleQuickSearch = (term: string) => {
     setQuickSearchTerm(term);
     if (term.length < 1) { setQsResults([]); return; }
     const ko = Object.entries(pokemonNameMap).filter(([k]) => k.includes(term)).map(([k, e]) => ({ name: e, ko: k }));
     setQsResults(ko.slice(0, 5));
+  };
+
+  const saveSearch = (p: any) => {
+    const newHistory = [p, ...searchHistory.filter(h => h.name !== p.name)].slice(0, 5);
+    setSearchHistory(newHistory);
+    localStorage.setItem('global_search_history', JSON.stringify(newHistory));
+    handleNav('counter'); // For now, go to counter checker
   };
 
   const triggerHaptic = () => {
@@ -105,39 +115,35 @@ const App: React.FC = () => {
                     <div className="lg:col-span-8 space-y-6">
                        <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-6 flex items-start gap-4 shadow-xl">
                           <div className="bg-poke-yellow p-3 rounded-2xl text-poke-dark shadow-lg shrink-0"><Info size={24} /></div>
-                          <div><h3 className="text-sm font-black uppercase text-poke-yellow mb-1 italic">Master of Masters Tip</h3><p className="text-lg font-bold text-gray-200 leading-snug">"{tips[tipIndex]}"</p></div>
+                          <div><h3 className="text-sm font-black uppercase text-poke-yellow mb-1 italic">Master's Mastery Tip</h3><p className="text-lg font-bold text-gray-200 leading-snug">"{tips[tipIndex]}"</p></div>
                        </div>
                        <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-6 shadow-xl">
-                          <h3 className="text-xs font-black uppercase text-poke-red mb-4 italic tracking-widest"><TrendingUp size={16}/> Series 19 Global Meta</h3>
+                          <h3 className="text-xs font-black uppercase text-poke-red mb-4 italic tracking-widest"><TrendingUp size={16}/> Usage Stats</h3>
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                              {usageStats.slice(0, 5).map(p => (<div key={p.rank} className="bg-poke-dark/50 p-2 rounded-xl border border-white/5 flex flex-col items-center"><span className="text-[8px] font-black text-poke-yellow uppercase">Rank {p.rank}</span><span className="text-[10px] font-bold text-white truncate w-full text-center">{p.koName}</span></div>))}
                           </div>
                        </div>
                     </div>
                     <div className="lg:col-span-4 bg-gradient-to-br from-poke-red/20 to-poke-red/5 border-2 border-poke-red/20 rounded-3xl p-6 flex flex-col justify-center items-center text-center shadow-xl relative overflow-hidden group cursor-pointer" onClick={() => handleNav('log')}>
-                      <Trophy className="text-poke-red mb-2 group-hover:scale-110 transition-transform" size={48} /><h3 className="text-xs font-black uppercase text-poke-red tracking-widest">그랜드 마스터 로그</h3><p className="font-black text-3xl text-white italic leading-none mt-1 uppercase">Hall of Fame</p>
+                      <Trophy className="text-poke-red mb-2 group-hover:scale-110 transition-transform" size={48} /><h3 className="text-xs font-black uppercase text-poke-red tracking-widest">나의 승전보</h3><p className="font-black text-3xl text-white italic leading-none mt-1 uppercase">Champion Logs</p>
                     </div>
                   </div>
 
-                  {/* Master 4x4 Grid (16 tools) */}
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-6">
                     <MenuButton onClick={() => handleNav('mbti')} icon="🐾" title="성향 테스트" color="border-poke-yellow" label="MBTI" />
                     <MenuButton onClick={() => handleNav('speed')} icon="⚡" title="스피드 계산" color="border-poke-red" label="SPEED" />
                     <MenuButton onClick={() => handleNav('damage')} icon="⚔️" title="데미지 시뮬" color="border-poke-blue" label="DAMAGE" />
                     <MenuButton onClick={() => handleNav('matrix')} icon="🥊" title="배틀 매트릭스" color="border-red-500" label="MATRIX" />
-                    
                     <MenuButton onClick={() => handleNav('matchup')} icon="🛡️" title="타입 상성" color="border-green-500" label="TYPES" />
                     <MenuButton onClick={() => handleNav('coverage')} icon="📊" title="파티 분석" color="border-purple-500" label="TEAM" />
                     <MenuButton onClick={() => handleNav('tiers')} icon="🏁" title="스피드 티어" color="border-orange-500" label="TIERS" />
                     <MenuButton onClick={() => handleNav('heatmap')} icon="🗺️" title="견제 분석" color="border-orange-400" label="HEATMAP" />
-                    
                     <MenuButton onClick={() => handleNav('partnership')} icon="🤝" title="팀 빌딩" color="border-indigo-500" label="PARTNER" />
-                    <MenuButton onClick={() => handleNav('control')} icon={<Wind/>} title="스피드 조절" color="border-cyan-400" label="CONTROL" />
+                    <MenuButton onClick={() => handleNav('control')} icon={<Wind size={48}/>} title="스피드 조절" color="border-cyan-400" label="CONTROL" />
                     <MenuButton onClick={() => handleNav('priority')} icon="🚀" title="우선도 가이드" color="border-cyan-500" label="PRIORITY" />
                     <MenuButton onClick={() => handleNav('counter')} icon="🎯" title="카운터 분석" color="border-pink-500" label="COUNTER" />
-                    
-                    <MenuButton onClick={() => handleNav('status')} icon={<Thermometer />} title="상태 이상" color="border-red-400" label="STATUS" />
-                    <MenuButton onClick={() => handleNav('items')} icon={<ShoppingBag />} title="도구 백과" color="border-indigo-400" label="ITEMS" />
+                    <MenuButton onClick={() => handleNav('status')} icon={<Thermometer size={48}/>} title="상태 이상" color="border-red-400" label="STATUS" />
+                    <MenuButton onClick={() => handleNav('items')} icon={<ShoppingBag size={48}/>} title="도구 백과" color="border-indigo-400" label="ITEMS" />
                     <MenuButton onClick={() => handleNav('log')} icon="📝" title="배틀 로그" color="border-blue-400" label="LOGS" />
                     <MenuButton onClick={() => handleNav('settings')} icon="⚙️" title="설정 및 테마" color="border-gray-500" label="CONFIG" />
                   </div>
@@ -175,8 +181,21 @@ const App: React.FC = () => {
                   <input autoFocus type="text" placeholder="포켓몬 퀵 검색 (한글)..." value={quickSearchTerm} onChange={e => handleQuickSearch(e.target.value)} className="w-full bg-white p-5 pl-12 rounded-3xl font-black text-lg text-poke-dark outline-none border-8 border-poke-yellow shadow-2xl" />
                   <button onClick={() => setShowQuickSearch(false)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
                </div>
+               
+               {/* Search History */}
+               {quickSearchTerm.length === 0 && searchHistory.length > 0 && (
+                  <div className="mt-4">
+                     <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-2 flex items-center gap-2 px-2"><Clock size={12}/> 최근 검색 기록</p>
+                     <div className="flex flex-wrap gap-2">
+                        {searchHistory.map(h => (
+                           <button key={h.name} onClick={() => saveSearch(h)} className="px-4 py-2 bg-white/10 text-white rounded-xl font-bold text-xs hover:bg-white/20 transition-all border border-white/10">{h.ko}</button>
+                        ))}
+                     </div>
+                  </div>
+               )}
+
                <div className="mt-3 space-y-1.5">
-                  {qsResults.map(p => (<button key={p.name} onClick={() => handleNav('counter')} className="w-full p-3 bg-white rounded-xl font-black text-sm text-poke-dark flex justify-between items-center hover:bg-poke-yellow transition-colors group"><span>{p.ko}</span><span className="text-[10px] text-gray-300 group-hover:text-poke-dark italic uppercase">{p.name}</span></button>))}
+                  {qsResults.map(p => (<button key={p.name} onClick={() => saveSearch(p)} className="w-full p-3 bg-white rounded-xl font-black text-sm text-poke-dark flex justify-between items-center hover:bg-poke-yellow transition-colors group"><span>{p.ko}</span><span className="text-[10px] text-gray-300 group-hover:text-poke-dark italic uppercase">{p.name}</span></button>))}
                </div>
             </div>
          </div>
@@ -192,7 +211,7 @@ const App: React.FC = () => {
       </nav>
 
       <footer className="bg-poke-dark p-6 text-center border-t-2 border-white/10 pb-24 md:pb-6">
-        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest italic tracking-[0.2em]">Pokémon Champions v12.0 Master of Masters</p>
+        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest italic tracking-[0.2em]">Pokémon Champions v13.0 Cinematic Mastery</p>
       </footer>
     </div>
   );

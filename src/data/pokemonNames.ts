@@ -85,3 +85,8 @@ export const moveNameMap: Record<string, string> = {
 export const getEnglishName = (koName: string): string => {
   return pokemonNameMap[koName] || koName.toLowerCase();
 };
+
+export const getAnimatedSprite = (enName: string): string => {
+  const name = enName.toLowerCase().replace(/ /g, '-');
+  return `https://play.pokemonshowdown.com/sprites/ani/${name}.gif`;
+};

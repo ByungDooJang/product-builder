@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Swords, ChevronLeft, Shield, Target, Search, Loader2, History, CloudSun, Zap as TerrainIcon, HelpCircle, X, ShoppingBag, Wand2, Star } from 'lucide-react';
 import axios from 'axios';
-import { pokemonNameMap, moveNameMap } from '../data/pokemonNames';
+import { pokemonNameMap, moveNameMap, getAnimatedSprite } from '../data/pokemonNames';
 import StatBars from './StatBars';
 
 interface DamageCalculatorProps {
@@ -128,9 +128,10 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
     const currentDefTypes = defenderTera === 'None' ? defenderBaseTypes : [defenderTera];
     currentDefTypes.forEach(defType => {
        const data = typeMatchups[defType];
-       if (data?.double.includes(moveType)) effectiveness *= 2;
-       if (data?.half.includes(moveType)) effectiveness *= 0.5;
-       if (data?.zero.includes(moveType)) effectiveness *= 0;
+       if (!data) return;
+       if (data.double.includes(moveType)) effectiveness *= 2;
+       if (data.half.includes(moveType)) effectiveness *= 0.5;
+       if (data.zero.includes(moveType)) effectiveness *= 0;
     });
 
     return Math.floor(baseDamage * stab * effectiveness * (isCritical ? 1.5 : 1.0) * random);
@@ -152,13 +153,10 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
     if (term.length < 1) { setSuggestions([]); return; }
     if (activeSearch === 'move') {
        const koMoveMatches = Object.entries(moveNameMap).filter(([ko]) => ko.includes(term)).map(([ko, en]) => ({ name: en, koName: ko }));
-       
        let combined: any[] = [...koMoveMatches];
-       // If we have attacker moves, prioritize/filter them
        if (attackerMoves.length > 0) {
           const learnable = attackerMoves.filter(m => m.includes(term.toLowerCase().replace(/ /g, '-')));
-          const learnableMatches = learnable.map(m => ({ name: m }));
-          combined = [...combined, ...learnableMatches];
+          combined = [...combined, ...learnable.map(m => ({ name: m }))];
        } else {
           try {
              const res = await axios.get('https://pokeapi.co/api/v2/move?limit=1000');
@@ -209,7 +207,6 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
       const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${p.name}`);
       const stats = response.data.stats;
       const typeList = response.data.types.map((t: any) => t.type.name.charAt(0).toUpperCase() + t.type.name.slice(1));
-      const spriteUrl = response.data.sprites.other['official-artwork'].front_default || response.data.sprites.front_default;
       
       const s = {
         hp: stats.find((s: any) => s.stat.name === 'hp').base_stat,
@@ -220,17 +217,19 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
         speed: stats.find((s: any) => s.stat.name === 'speed').base_stat
       };
 
+      const aniSprite = getAnimatedSprite(p.name);
+
       if (target === 'attacker') {
         setAtkBase(moveCategory === 'physical' ? s.atk : s.spAtk);
         setAttackerBaseTypes(typeList);
-        setAttackerSprite(spriteUrl);
+        setAttackerSprite(aniSprite);
         setAtkFullStats(s);
         setAttackerMoves(response.data.moves.map((m: any) => m.move.name));
       } else {
         setDefBase(moveCategory === 'physical' ? s.def : s.spDef);
         setHpBase(s.hp);
         setDefenderBaseTypes(typeList);
-        setDefenderSprite(spriteUrl);
+        setDefenderSprite(aniSprite);
         setDefFullStats(s);
       }
     } catch (error) { alert('실패'); }
@@ -252,7 +251,7 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
         <div className="flex items-center justify-between mb-8 border-b-4 border-gray-100 pb-4">
           <div className="flex items-center gap-4">
             <div className="bg-poke-blue p-3 rounded-2xl text-white shadow-lg animate-pulse"><Swords size={32} /></div>
-            <div><h2 className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none">데미지 시뮬레이터</h2><p className="text-[10px] md:text-xs text-gray-500 font-bold italic">Smart Move Search Active!</p></div>
+            <div><h2 className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none">데미지 시뮬레이터</h2><p className="text-[10px] md:text-xs text-gray-500 font-bold italic">Cinematic Mastery Active!</p></div>
           </div>
           <div className="flex gap-2">
              <button onClick={() => applyPreset('AS')} className="p-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded-full transition-all" title="공격 프리셋"><Wand2 size={24} /></button>
@@ -260,20 +259,28 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Battle Scene */}
+        {/* Battle Scene with Animated Sprites */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-           <div className="bg-gray-50 rounded-2xl p-4 border-2 border-gray-100 flex flex-col items-center">
-              <div className={`w-32 h-32 bg-white rounded-full border-4 ${attackerTera !== 'None' ? 'border-poke-yellow shadow-lg' : 'border-poke-blue/20'} flex items-center justify-center overflow-hidden mb-2`}>{attackerSprite ? <img src={attackerSprite} className="w-28 h-28 object-contain scale-x-[-1]" /> : <Target className="text-gray-200" size={40} />}</div>
-              <select value={attackerTera} onChange={e => setAttackerTera(e.target.value)} className="text-[9px] font-black p-1 bg-white border rounded mb-2"><option value="None">Tera OFF</option>{types.map(t => <option key={t} value={t}>Tera: {t}</option>)}</select>
-              {atkFullStats && <StatBars stats={atkFullStats} />}
-           </div>
-           <div className="bg-gray-50 rounded-2xl p-4 border-2 border-gray-100 flex flex-col items-center">
-              <div className={`w-32 h-32 bg-white rounded-full border-4 ${defenderTera !== 'None' ? 'border-poke-yellow shadow-lg' : 'border-poke-red/20'} flex items-center justify-center overflow-hidden relative mb-2`}>
-                 {defenderSprite ? <img src={defenderSprite} className="w-28 h-28 object-contain" /> : <Shield className="text-gray-200" size={40} />}
-                 <div className="absolute bottom-0 left-0 w-full h-2 bg-gray-200"><div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${100 - maxPercent}%` }}></div></div>
+           <div className="bg-gray-50 rounded-2xl p-4 border-2 border-gray-100 flex flex-col items-center shadow-inner relative overflow-hidden">
+              <div className={`w-32 h-32 flex items-center justify-center mb-2 z-10`}>
+                 {attackerSprite ? <img src={attackerSprite} className="h-28 object-contain scale-x-[-1]" /> : <Target className="text-gray-200" size={40} />}
               </div>
-              <select value={defenderTera} onChange={e => setDefenderTera(e.target.value)} className="text-[9px] font-black p-1 bg-white border rounded mb-2"><option value="None">Tera OFF</option>{types.map(t => <option key={t} value={t}>Tera: {t}</option>)}</select>
-              {defFullStats && <StatBars stats={defFullStats} />}
+              <div className="z-10 flex flex-col items-center w-full">
+                 <select value={attackerTera} onChange={e => setAttackerTera(e.target.value)} className={`text-[9px] font-black p-1 border-2 rounded mb-2 w-24 ${attackerTera !== 'None' ? 'bg-poke-yellow border-poke-yellow' : 'bg-white border-gray-100'}`}><option value="None">Tera OFF</option>{types.map(t => <option key={t} value={t}>Tera: {t}</option>)}</select>
+                 {atkFullStats && <StatBars stats={atkFullStats} />}
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-blue-100/20 to-transparent pointer-events-none"></div>
+           </div>
+           <div className="bg-gray-50 rounded-2xl p-4 border-2 border-gray-100 flex flex-col items-center shadow-inner relative overflow-hidden">
+              <div className={`w-32 h-32 flex items-center justify-center mb-2 z-10 relative`}>
+                 {defenderSprite ? <img src={defenderSprite} className="h-28 object-contain" /> : <Shield className="text-gray-200" size={40} />}
+                 <div className="absolute bottom-0 left-0 w-full h-2 bg-gray-200 rounded-full overflow-hidden border border-white"><div className="h-full bg-green-500 transition-all duration-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" style={{ width: `${100 - maxPercent}%` }}></div></div>
+              </div>
+              <div className="z-10 flex flex-col items-center w-full">
+                 <select value={defenderTera} onChange={e => setDefenderTera(e.target.value)} className={`text-[9px] font-black p-1 border-2 rounded mb-2 w-24 ${defenderTera !== 'None' ? 'bg-poke-yellow border-poke-yellow' : 'bg-white border-gray-100'}`}><option value="None">Tera OFF</option>{types.map(t => <option key={t} value={t}>Tera: {t}</option>)}</select>
+                 {defFullStats && <StatBars stats={defFullStats} />}
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-red-100/20 to-transparent pointer-events-none"></div>
            </div>
         </div>
 
@@ -293,18 +300,18 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-5 rounded-2xl border border-gray-100 shadow-inner">
                  <div className="space-y-2">
-                    <h4 className="text-[10px] font-black uppercase text-poke-blue italic">Attacker Stats</h4>
+                    <h4 className="text-[10px] font-black uppercase text-poke-blue italic">Attacker Fine-tuning</h4>
                     <div className="grid grid-cols-3 gap-1">
-                       <div><label className="text-[8px] font-black text-gray-400">Base</label><input type="number" value={atkBase} onChange={e => setAtkBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
+                       <div><label className="text-[8px] font-black text-gray-400">B</label><input type="number" value={atkBase} onChange={e => setAtkBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                        <div><label className="text-[8px] font-black text-gray-400">IV</label><input type="number" value={atkIv} onChange={e => setAtkIv(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                        <div><label className="text-[8px] font-black text-gray-400">EV</label><input type="number" value={atkEv} onChange={e => setAtkEv(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                     </div>
                  </div>
                  <div className="space-y-2">
-                    <h4 className="text-[10px] font-black uppercase text-poke-red italic">Defender Stats</h4>
+                    <h4 className="text-[10px] font-black uppercase text-poke-red italic">Defender Fine-tuning</h4>
                     <div className="grid grid-cols-3 gap-1">
-                       <div><label className="text-[8px] font-black text-gray-400">Def B</label><input type="number" value={defBase} onChange={e => setDefBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
-                       <div><label className="text-[8px] font-black text-gray-400">HP B</label><input type="number" value={hpBase} onChange={e => setHpBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
+                       <div><label className="text-[8px] font-black text-gray-400">D-B</label><input type="number" value={defBase} onChange={e => setDefBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
+                       <div><label className="text-[8px] font-black text-gray-400">H-B</label><input type="number" value={hpBase} onChange={e => setHpBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                        <div><label className="text-[8px] font-black text-gray-400">EV</label><input type="number" value={defEv} onChange={e => setDefEv(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                     </div>
                  </div>
@@ -314,12 +321,16 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
            <div className="lg:col-span-4 space-y-4">
               <div className="bg-poke-dark rounded-3xl p-5 text-white text-center shadow-2xl border border-white/5 relative overflow-hidden">
                  <p className="text-[9px] font-black uppercase text-poke-yellow mb-1 tracking-widest italic underline decoration-poke-red decoration-2">Battle Insights</p>
-                 <div className="text-3xl font-black italic mb-0.5">{minDamage} ~ {maxDamage}</div>
+                 <div className="text-3xl font-black italic mb-0.5 animate-in slide-in-from-top-2" key={maxDamage}>{minDamage} ~ {maxDamage}</div>
                  <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden mb-2 shadow-inner"><div className="h-full bg-gradient-to-r from-red-500 via-yellow-400 to-green-500 shadow-[0_0_10px_rgba(255,203,5,0.3)]" style={{ width: `${maxPercent}%` }}></div></div>
                  <p className="text-[9px] font-bold text-gray-400 italic leading-none">{minPercent}% ~ {maxPercent}% Deals</p>
                  <div className="mt-4 py-2 border-y border-white/5">
                     <span className="text-[10px] font-black text-poke-red animate-pulse uppercase italic">Estimated KO: {Math.ceil(finalHpValue/minDamage)} Turns</span>
                  </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                 <select value={weather} onChange={e => setWeather(e.target.value as any)} className="bg-gray-100 p-2 rounded-xl font-bold text-[9px] uppercase"><option value="none">날씨: 없음</option><option value="sun">쾌청</option><option value="rain">비</option></select>
+                 <select value={terrain} onChange={e => setTerrain(e.target.value as any)} className="bg-gray-100 p-2 rounded-xl font-bold text-[9px] uppercase"><option value="none">필드: 없음</option><option value="electric">일렉트릭</option><option value="grassy">그래스</option></select>
               </div>
               <button onClick={saveToHistory} className="w-full py-3 bg-poke-blue text-white font-black rounded-2xl text-xs uppercase italic hover:bg-blue-700 shadow-lg transition-all active:scale-95">결과 저장 (Save Stats)</button>
            </div>

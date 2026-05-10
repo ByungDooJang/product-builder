@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, ChevronLeft, Search, Loader2, Plus, X, AlertTriangle, Share2, FileDown, Download, Save, FolderOpen, Edit3, ClipboardCheck } from 'lucide-react';
+import { Users, ChevronLeft, Search, Loader2, Plus, X, AlertTriangle, Share2, FileDown, Download, Save, FolderOpen, Edit3, ClipboardCheck, Sparkles, Target } from 'lucide-react';
 import axios from 'axios';
-import { pokemonNameMap } from '../data/pokemonNames';
+import { pokemonNameMap, getAnimatedSprite } from '../data/pokemonNames';
 import html2canvas from 'html2canvas';
 
 interface TeamMember {
@@ -87,19 +87,12 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
   useEffect(() => { localStorage.setItem('poke_team', JSON.stringify(team)); }, [team]);
   useEffect(() => { localStorage.setItem('all_poke_teams', JSON.stringify(savedTeams)); }, [savedTeams]);
 
-  const exportToShowdown = () => {
-    if (team.length === 0) return;
-    const text = team.map(m => `${m.name.charAt(0).toUpperCase() + m.name.slice(1)}\nAbility: AbilityName\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Move 1\n- Move 2\n- Move 3\n- Move 4\n`).join('\n');
-    navigator.clipboard.writeText(text);
-    alert('쇼다운 텍스트 형식이 클립보드에 복사되었습니다!');
-  };
-
   const saveCurrentTeam = () => {
     if (team.length === 0) return;
     const newTeam: SavedTeam = { id: Date.now().toString(), title: teamTitle, members: [...team], updatedAt: Date.now() };
     const updated = [newTeam, ...savedTeams.filter(t => t.title !== teamTitle)].slice(0, 10);
     setSavedTeams(updated);
-    alert('파티가 저장소에 보관되었습니다!');
+    alert('파티 저장 완료!');
   };
 
   const loadTeam = (t: SavedTeam) => {
@@ -107,8 +100,6 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
     setTeamTitle(t.title);
     setShowManager(false);
   };
-
-  const deleteSavedTeam = (id: string) => setSavedTeams(savedTeams.filter(t => t.id !== id));
 
   const addPokemon = async (p: any) => {
     if (team.length >= 6) { alert('최대 6마리!'); return; }
@@ -122,18 +113,25 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
         name: p.name,
         koName: p.koName || Object.keys(pokemonNameMap).find(key => pokemonNameMap[key] === p.name.toLowerCase()),
         types: res.data.types.map((t: any) => t.type.name.charAt(0).toUpperCase() + t.type.name.slice(1)),
-        sprite: res.data.sprites.front_default
+        sprite: getAnimatedSprite(p.name)
       };
       setTeam(prev => [...prev, newMember].slice(0, 6));
-    } catch (e) { console.error(e); }
+    } catch (e) {}
     finally { setIsSearching(false); }
   };
 
-  const shareTeam = () => {
-    const encoded = toBase64(JSON.stringify(team));
-    const url = `${window.location.origin}${window.location.pathname}#team=${encoded}`;
-    if (navigator.share) navigator.share({ title: teamTitle, url });
-    else { navigator.clipboard.writeText(url); alert('링크 복사 완료!'); }
+  const calculateSynergy = () => {
+    if (team.length === 0) return { score: 0, grade: '?' };
+    let score = 50;
+    const { weaknesses, resistances } = calculateCoverage();
+    
+    // Penalize stacked weaknesses
+    Object.values(weaknesses).forEach(v => { if (v >= 3) score -= 15; });
+    // Bonus for wide resistances
+    Object.values(resistances).forEach(v => { if (v >= 1) score += 3; });
+    
+    const grade = score >= 90 ? 'S' : score >= 80 ? 'A' : score >= 70 ? 'B' : score >= 60 ? 'C' : 'D';
+    return { score: Math.min(100, Math.max(0, score)), grade };
   };
 
   const calculateCoverage = () => {
@@ -142,96 +140,52 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
     types.forEach(t => { weaknesses[t.name] = 0; resistances[t.name] = 0; });
     team.forEach(member => {
       types.forEach(type => {
-        let score = 1;
+        let s = 1;
         member.types.forEach(mType => {
           const data = typeMatchups[mType];
-          if (data?.double.includes(type.name)) score *= 2;
-          if (data?.half.includes(type.name)) score *= 0.5;
-          if (data?.zero.includes(type.name)) score *= 0;
+          if (data?.double.includes(type.name)) s *= 2;
+          if (data?.half.includes(type.name)) s *= 0.5;
+          if (data?.zero.includes(type.name)) s *= 0;
         });
-        if (score > 1) weaknesses[type.name]++;
-        if (score < 1) resistances[type.name]++;
+        if (s > 1) weaknesses[type.name]++;
+        if (s < 1) resistances[type.name]++;
       });
     });
     return { weaknesses, resistances };
   };
 
   const defResults = calculateCoverage();
-
-  const downloadTeamImage = async () => {
-    if (!cardRef.current) return;
-    const canvas = await html2canvas(cardRef.current, { backgroundColor: '#EE1515', scale: 2, useCORS: true });
-    const link = document.createElement('a');
-    link.download = `MyPokemonTeam.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  };
+  const synergy = calculateSynergy();
 
   return (
     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center mb-8">
         <button onClick={onBack} className="flex items-center gap-2 text-white/70 hover:text-white transition-colors font-bold uppercase"><ChevronLeft size={20} /> 메뉴</button>
         <div className="flex gap-2">
-          <button onClick={exportToShowdown} className="bg-gray-800 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><ClipboardCheck size={16} /> Export</button>
           <button onClick={() => setShowManager(true)} className="bg-purple-600 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><FolderOpen size={16} /> 저장소</button>
-          <button onClick={() => setShowImport(true)} className="bg-gray-700 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><FileDown size={16} /> Import</button>
-          {team.length > 0 && <button onClick={shareTeam} className="bg-poke-blue text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg hover:scale-105 transition-transform"><Share2 size={16} /> 공유</button>}
+          {team.length > 0 && <button onClick={() => {
+            const encoded = toBase64(JSON.stringify(team));
+            const url = `${window.location.origin}${window.location.pathname}#team=${encoded}`;
+            navigator.clipboard.writeText(url); alert('링크 복사 완료!');
+          }} className="bg-poke-blue text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><Share2 size={16} /> 공유</button>}
         </div>
       </div>
-
-      {/* Team Manager Modal */}
-      {showManager && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white rounded-3xl p-8 w-full max-w-lg border-8 border-purple-500 shadow-2xl">
-               <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-black text-poke-dark uppercase italic flex items-center gap-2"><FolderOpen /> 파티 저장소</h3>
-                  <button onClick={() => setShowManager(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={24} /></button>
-               </div>
-               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                  {savedTeams.length === 0 && <p className="text-center py-10 text-gray-400 font-bold italic">저장된 파티가 없습니다.</p>}
-                  {savedTeams.map(t => (
-                     <div key={t.id} className="bg-gray-50 p-4 rounded-2xl border-2 border-gray-100 flex items-center justify-between group hover:border-purple-200 transition-colors">
-                        <div className="flex-1 cursor-pointer" onClick={() => loadTeam(t)}>
-                           <p className="font-black text-sm text-poke-dark">{t.title}</p>
-                           <p className="text-[10px] text-gray-400">{t.members.length}마리 / {new Date(t.updatedAt).toLocaleDateString()}</p>
-                        </div>
-                        <button onClick={() => deleteSavedTeam(t.id)} className="text-gray-300 hover:text-red-500 p-2"><X size={18} /></button>
-                     </div>
-                  ))}
-               </div>
-            </div>
-         </div>
-      )}
-
-      {/* Showdown Import Modal */}
-      {showImport && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl p-8 w-full max-w-md border-8 border-poke-red">
-               <h3 className="text-xl font-black text-poke-dark mb-4 uppercase italic">Showdown Import</h3>
-               <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="Paste Showdown team here..." className="w-full h-40 bg-gray-100 p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-poke-red transition-all mb-4" />
-               <div className="flex gap-2">
-                  <button onClick={async () => { const names = importText.split('\n').filter(l => l.trim()).map(l => l.split(' ')[0].split('(')[0].trim()); setTeam([]); for(const n of names.slice(0,6)) await addPokemon({name:n}); setShowImport(false); }} className="flex-1 py-3 bg-poke-red text-white font-black rounded-xl uppercase italic">가져오기</button>
-                  <button onClick={() => setShowImport(false)} className="px-6 py-3 bg-gray-200 text-gray-500 font-black rounded-xl uppercase italic">취소</button>
-               </div>
-            </div>
-         </div>
-      )}
 
       <div ref={cardRef} className="bg-white rounded-3xl p-8 border-8 border-poke-red shadow-[0_12px_0_0_rgba(238,21,21,1)] text-poke-dark relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b-4 border-gray-100 pb-4">
           <div className="flex items-center gap-4">
              <div className="bg-poke-red p-3 rounded-2xl text-white shadow-lg"><Users size={32} /></div>
              <div>
-                <div className="flex items-center gap-2 group">
-                   <input type="text" value={teamTitle} onChange={e => setTeamTitle(e.target.value)} className="text-2xl font-black uppercase tracking-tighter outline-none bg-transparent focus:bg-gray-50 rounded px-1 border-b-2 border-transparent focus:border-poke-red w-48" />
-                   <Edit3 size={16} className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <p className="text-gray-500 font-bold italic">Strategy Hub & Party Manager</p>
+                <input type="text" value={teamTitle} onChange={e => setTeamTitle(e.target.value)} className="text-2xl font-black uppercase tracking-tighter outline-none bg-transparent focus:bg-gray-50 rounded px-1 border-b-2 border-transparent focus:border-poke-red w-48" />
+                <p className="text-gray-500 font-bold italic">Cinematic Team Insight</p>
              </div>
           </div>
-          <div className="flex gap-2">
-             <button onClick={downloadTeamImage} className="bg-green-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase italic flex items-center gap-2 hover:bg-green-700 shadow-md hide-on-capture"><Download size={16} /> 이미지 저장</button>
-             <button onClick={saveCurrentTeam} className="bg-poke-dark text-white px-6 py-2 rounded-xl font-black text-xs uppercase italic flex items-center justify-center gap-2 hover:bg-black transition-colors hide-on-capture"><Save size={16} /> 파티 저장</button>
+          <div className="flex items-center gap-4">
+             <div className="bg-poke-dark text-white px-6 py-2 rounded-2xl flex flex-col items-center">
+                <span className="text-[8px] font-black uppercase text-poke-yellow">Synergy Score</span>
+                <span className="text-2xl font-black italic">{synergy.grade} GRADE</span>
+             </div>
+             <button onClick={saveCurrentTeam} className="bg-gray-700 text-white p-3 rounded-xl hover:bg-black transition-colors hide-on-capture"><Save size={20} /></button>
           </div>
         </div>
 
@@ -242,11 +196,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
                 <input type="text" placeholder="포켓몬 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-50 border-4 border-transparent focus:border-poke-red outline-none p-4 pl-12 rounded-2xl font-bold transition-all shadow-inner" />
                 {suggestions.length > 0 && (
                   <div className="absolute z-30 w-full mt-2 bg-white border-4 border-poke-red rounded-xl shadow-2xl overflow-hidden">
-                    {suggestions.map(p => (
-                      <button key={p.name} onClick={() => addPokemon(p)} className="w-full p-4 text-left hover:bg-yellow-50 font-bold capitalize flex justify-between border-b border-gray-100">
-                        <span>{p.koName || p.name}</span><Plus size={20} className="text-poke-red" />
-                      </button>
-                    ))}
+                    {suggestions.map(p => (<button key={p.name} onClick={() => addPokemon(p)} className="w-full p-4 text-left hover:bg-yellow-50 font-bold capitalize flex justify-between border-b border-gray-100"><span>{p.koName || p.name}</span><Plus size={20} className="text-poke-red" /></button>))}
                   </div>
                 )}
              </div>
@@ -255,7 +205,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
                 {team.map(m => (
                    <div key={m.id} className="relative bg-gray-50 p-4 rounded-2xl border-2 border-gray-100 flex flex-col items-center group animate-in zoom-in">
                       <button onClick={() => setTeam(team.filter(x => x.id !== m.id))} className="absolute -top-2 -right-2 bg-white text-gray-400 rounded-full p-1 shadow-md border border-gray-100 hide-on-capture"><X size={16} /></button>
-                      <img src={m.sprite} className="w-20 h-20 object-contain mb-2" crossOrigin="anonymous" />
+                      <img src={m.sprite} className="h-20 object-contain mb-2" crossOrigin="anonymous" />
                       <span className="font-black text-[10px] text-center capitalize">{m.koName || m.name}</span>
                    </div>
                 ))}
@@ -264,7 +214,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
           </div>
 
           <div className="lg:col-span-4 bg-gray-50 rounded-2xl p-6 border-2 border-gray-100">
-             <h3 className="text-[10px] font-black uppercase mb-4 text-poke-red flex items-center gap-2 tracking-widest"><AlertTriangle size={14}/> 파티 약점 분석</h3>
+             <h3 className="text-[10px] font-black uppercase mb-4 text-poke-red flex items-center gap-2 tracking-widest"><AlertTriangle size={14}/> Weakness Analysis</h3>
              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
                 {types.map(t => {
                    const val = defResults.weaknesses[t.name];
@@ -272,7 +222,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
                    return (
                       <div key={t.name} className="bg-white p-2 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm">
                          <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }}></span><span className="font-black text-[10px] uppercase">{t.ko}</span></div>
-                         <span className={`text-[9px] font-black ${val >= 3 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>약점: {val}</span>
+                         <span className={`text-[9px] font-black ${val >= 3 ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}>Weak: {val}</span>
                       </div>
                    );
                 })}
