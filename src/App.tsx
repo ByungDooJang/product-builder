@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import SpeedCalculator from './components/SpeedCalculator';
 import TrainerTest from './components/TrainerTest';
+import DamageCalculator from './components/DamageCalculator';
 
-type View = 'home' | 'mbti' | 'speed';
+type View = 'home' | 'mbti' | 'speed' | 'damage';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
@@ -13,9 +14,11 @@ const App: React.FC = () => {
         return <SpeedCalculator onBack={() => setView('home')} />;
       case 'mbti':
         return <TrainerTest onBack={() => setView('home')} />;
+      case 'damage':
+        return <DamageCalculator onBack={() => setView('home')} />;
       default:
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-6xl">
             {/* Menu 1: MBTI Test */}
             <button 
               onClick={() => setView('mbti')}
@@ -43,10 +46,25 @@ const App: React.FC = () => {
               </div>
               <div className="absolute -top-4 -right-4 w-12 h-12 bg-white rounded-full border-4 border-poke-red opacity-20 group-hover:opacity-100 transition-opacity"></div>
             </button>
+
+            {/* Menu 3: Damage Calculator */}
+            <button 
+              onClick={() => setView('damage')}
+              className="group relative bg-white rounded-3xl p-8 border-8 border-poke-blue shadow-[0_10px_0_0_rgba(59,76,202,1)] hover:translate-y-1 hover:shadow-none transition-all duration-200 cursor-pointer"
+            >
+              <div className="flex flex-col items-center gap-4 text-poke-dark">
+                <div className="text-6xl mb-2">⚔️</div>
+                <h2 className="text-2xl font-black uppercase">실시간 데미지 계산기</h2>
+                <p className="font-bold text-gray-600">얼마나 아프게 때릴까?</p>
+                <div className="mt-4 px-6 py-2 bg-poke-blue text-white font-black rounded-full text-sm uppercase italic">Damage Calc</div>
+              </div>
+              <div className="absolute -top-4 -right-4 w-12 h-12 bg-white rounded-full border-4 border-poke-blue opacity-20 group-hover:opacity-100 transition-opacity"></div>
+            </button>
           </div>
         );
     }
   };
+
 
   return (
     <div className="flex flex-col min-h-screen">
