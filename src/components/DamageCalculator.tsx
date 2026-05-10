@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Swords, ChevronLeft, Shield, Target, Search, Loader2, History, CloudSun, Zap as TerrainIcon, HelpCircle, X, ShoppingBag } from 'lucide-react';
+import { Swords, ChevronLeft, Shield, Target, Search, Loader2, History, CloudSun, Zap as TerrainIcon, HelpCircle, X, ShoppingBag, Wand2 } from 'lucide-react';
 import axios from 'axios';
 import { pokemonNameMap, moveNameMap } from '../data/pokemonNames';
 
@@ -11,26 +11,40 @@ interface PokemonData {
   name: string;
   koName?: string;
   sprite?: string;
+  baseStats?: any;
 }
 
 const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   const [level, setLevel] = useState<number>(50);
-  const [attack, setAttack] = useState<number>(100);
-  const [defense, setDefense] = useState<number>(100);
-  const [maxHp, setMaxHp] = useState<number>(150); 
+  const [moveType, setMoveType] = useState<string>('Normal');
+  const [moveCategory, setMoveCategory] = useState<'physical' | 'special'>('physical');
   const [power, setPower] = useState<number>(80);
   const [typeEffectiveness, setTypeEffectiveness] = useState<number>(1.0);
   const [isStab, setIsStab] = useState<boolean>(true);
   const [isCritical, setIsCritical] = useState<boolean>(false);
+
+  // Attacker Stats
+  const [atkBase, setAtkBase] = useState<number>(100);
+  const [atkIv, setAtkIv] = useState<number>(31);
+  const [atkEv, setAtkEv] = useState<number>(252);
+  const [atkNature, setAtkNature] = useState<number>(1.1);
   const [atkRank, setAtkRank] = useState<number>(0);
+
+  // Defender Stats
+  const [defBase, setDefBase] = useState<number>(100);
+  const [defIv, setDefIv] = useState<number>(31);
+  const [defEv, setDefEv] = useState<number>(0);
+  const [defNature, setDefNature] = useState<number>(1.0);
   const [defRank, setDefRank] = useState<number>(0);
+  const [hpBase, setHpBase] = useState<number>(100);
+  const [hpIv, setHpIv] = useState<number>(31);
+  const [hpEv, setHpEv] = useState<number>(0);
 
   // Advanced Modifiers
   const [item, setItem] = useState<string>('none');
   const [ability, setAbility] = useState<string>('none');
   const [weather, setWeather] = useState<'none' | 'sun' | 'rain' | 'sand' | 'snow'>('none');
   const [terrain, setTerrain] = useState<'none' | 'electric' | 'grassy' | 'psychic' | 'misty'>('none');
-  const [moveType, setMoveType] = useState<string>('Normal');
 
   const [attackerSprite, setAttackerSprite] = useState<string | null>(null);
   const [defenderSprite, setDefenderSprite] = useState<string | null>(null);
@@ -48,16 +62,29 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
     if (saved) setHistory(JSON.parse(saved));
   }, []);
 
+  // Stat Calculators
+  const calcStat = (base: number, iv: number, ev: number, nature: number) => {
+    return Math.floor((Math.floor((base * 2 + iv + Math.floor(ev / 4)) * level / 100) + 5) * nature);
+  };
+  const calcHp = (base: number, iv: number, ev: number) => {
+    if (base === 1) return 1; // Shedinja
+    return Math.floor((base * 2 + iv + Math.floor(ev / 4)) * level / 100) + level + 10;
+  };
+
+  const finalAtkValue = calcStat(atkBase, atkIv, atkEv, atkNature);
+  const finalDefValue = calcStat(defBase, defIv, defEv, defNature);
+  const finalHpValue = calcHp(hpBase, hpIv, hpEv);
+
   const calculateDamage = (random: number) => {
     const getRankMult = (r: number) => r >= 0 ? (2 + r) / 2 : 2 / (2 - r);
-    let finalAtk = attack * getRankMult(atkRank);
-    let finalDef = defense * getRankMult(defRank);
+    let finalAtk = finalAtkValue * getRankMult(atkRank);
+    let finalDef = finalDefValue * getRankMult(defRank);
 
-    // Item/Ability modifiers
     if (item === 'life-orb') finalAtk *= 1.3;
-    if (item === 'choice-band' || item === 'choice-specs') finalAtk *= 1.5;
+    if (item === 'choice-band' && moveCategory === 'physical') finalAtk *= 1.5;
+    if (item === 'choice-specs' && moveCategory === 'special') finalAtk *= 1.5;
     if (item === 'expert-belt' && typeEffectiveness > 1) finalAtk *= 1.2;
-    if (item === 'assault-vest') finalDef *= 1.5;
+    if (item === 'assault-vest' && moveCategory === 'special') finalDef *= 1.5;
     if (ability === 'guts') finalAtk *= 1.5;
     if (ability === 'huge-power') finalAtk *= 2.0;
 
@@ -75,14 +102,14 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
 
   const minDamage = calculateDamage(0.85);
   const maxDamage = calculateDamage(1.0);
-  const minPercent = Math.min(100, Math.floor((minDamage / maxHp) * 100));
-  const maxPercent = Math.min(100, Math.floor((maxDamage / maxHp) * 100));
+  const minPercent = Math.min(100, Math.floor((minDamage / finalHpValue) * 100));
+  const maxPercent = Math.min(100, Math.floor((maxDamage / finalHpValue) * 100));
 
   const getKOTurns = () => {
-    if (minDamage >= maxHp) return "확정 1타 (Guaranteed 1HKO)";
-    if (maxDamage >= maxHp) return "난수 1타 (Chance to 1HKO)";
-    if (minDamage * 2 >= maxHp) return "확정 2타 (Guaranteed 2HKO)";
-    if (maxDamage * 2 >= maxHp) return "난수 2타 (Chance to 2HKO)";
+    if (minDamage >= finalHpValue) return "확정 1타 (Guaranteed 1HKO)";
+    if (maxDamage >= finalHpValue) return "난수 1타 (Chance to 1HKO)";
+    if (minDamage * 2 >= finalHpValue) return "확정 2타 (Guaranteed 2HKO)";
+    if (maxDamage * 2 >= finalHpValue) return "난수 2타 (Chance to 2HKO)";
     return "3타 이상 (3HKO or more)";
   };
 
@@ -93,8 +120,7 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
        try {
           const res = await axios.get('https://pokeapi.co/api/v2/move?limit=1000');
           const enMatches = res.data.results.filter((m: any) => m.name.toLowerCase().includes(term.toLowerCase())).map((m: any) => ({ name: m.name }));
-          const combined = [...koMoveMatches, ...enMatches].slice(0, 5);
-          setSuggestions(combined);
+          setSuggestions([...koMoveMatches, ...enMatches].slice(0, 5));
        } catch (e) {}
        return;
     }
@@ -124,7 +150,8 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
       if (res.data.power) setPower(res.data.power);
       const type = res.data.type.name.charAt(0).toUpperCase() + res.data.type.name.slice(1);
       setMoveType(type);
-    } catch (e) { alert('기술 로딩 실패'); }
+      setMoveCategory(res.data.damage_class.name);
+    } catch (e) { alert('실패'); }
     finally { setIsSearching(null); }
   };
 
@@ -140,14 +167,14 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
       if (target === 'attacker') {
         const atk = stats.find((s: any) => s.stat.name === 'attack')?.base_stat || 100;
         const spAtk = stats.find((s: any) => s.stat.name === 'special-attack')?.base_stat || 100;
-        setAttack(Math.max(atk, spAtk));
+        setAtkBase(moveCategory === 'physical' ? atk : spAtk);
         setAttackerSprite(spriteUrl);
       } else {
         const def = stats.find((s: any) => s.stat.name === 'defense')?.base_stat || 100;
         const spDef = stats.find((s: any) => s.stat.name === 'special-defense')?.base_stat || 100;
         const hp = stats.find((s: any) => s.stat.name === 'hp')?.base_stat || 100;
-        setDefense(Math.max(def, spDef));
-        setMaxHp(Math.floor((hp * 2 + 31 + 252/4) * 50 / 100 + 50 + 10));
+        setDefBase(moveCategory === 'physical' ? def : spDef);
+        setHpBase(hp);
         setDefenderSprite(spriteUrl);
       }
     } catch (error) { alert('실패'); }
@@ -168,12 +195,10 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
       {showNatureRef && (
          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white rounded-3xl p-8 w-full max-w-lg border-8 border-poke-red shadow-2xl">
-               <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-black text-poke-dark uppercase italic tracking-tighter underline decoration-poke-yellow decoration-4">성격 일람표</h3><button onClick={() => setShowNatureRef(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button></div>
+               <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-black text-poke-dark uppercase italic">성격표</h3><button onClick={() => setShowNatureRef(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button></div>
                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="bg-blue-50 p-3 rounded-xl border-2 border-blue-100"><p className="font-black text-blue-600 mb-2 italic">스피드 상승</p><p className="font-bold">겁쟁이 (Timid), 명랑 (Jolly)</p></div>
-                  <div className="bg-red-50 p-3 rounded-xl border-2 border-red-100"><p className="font-black text-red-600 mb-2 italic">공격/특공 상승</p><p className="font-bold">고집 (Adamant), 조심 (Modest)</p></div>
-                  <div className="bg-green-50 p-3 rounded-xl border-2 border-green-100"><p className="font-black text-green-600 mb-2 italic">방어/특방 상승</p><p className="font-bold">장난꾸러기 (Impish), 신중 (Careful)</p></div>
-                  <div className="bg-yellow-50 p-3 rounded-xl border-2 border-yellow-100"><p className="font-black text-yellow-600 mb-2 italic">스피드 하락</p><p className="font-bold">용감 (Brave), 냉정 (Quiet)</p></div>
+                  <div className="bg-blue-50 p-3 rounded-xl border-2 border-blue-100"><p className="font-black text-blue-600 mb-2">스피드 +</p><p>겁쟁이, 명랑, 성급, 천진난만</p></div>
+                  <div className="bg-red-50 p-3 rounded-xl border-2 border-red-100"><p className="font-black text-red-600 mb-2">화력 +</p><p>고집, 조심, 용감, 냉정</p></div>
                </div>
             </div>
          </div>
@@ -183,15 +208,16 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
         <div className="flex items-center justify-between mb-8 border-b-4 border-gray-100 pb-4">
           <div className="flex items-center gap-4">
             <div className="bg-poke-blue p-3 rounded-2xl text-white shadow-lg animate-pulse"><Swords size={32} /></div>
-            <div><h2 className="text-3xl font-black uppercase tracking-tighter">데미지 계산기</h2><p className="text-gray-500 font-bold italic">Pro Presets & Move Mapping Active!</p></div>
+            <div><h2 className="text-3xl font-black uppercase tracking-tighter">데미지 계산기</h2><p className="text-gray-500 font-bold italic">Full Stat Calculation Active!</p></div>
           </div>
           <button onClick={() => setShowNatureRef(true)} className="p-2 bg-gray-100 text-gray-400 hover:text-poke-blue rounded-full transition-all hover:rotate-12"><HelpCircle size={24} /></button>
         </div>
 
+        {/* Battle Scene */}
         <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-6 mb-8 border-2 border-gray-100 shadow-inner relative overflow-hidden">
           <div className="z-10 flex flex-col items-center gap-2">
             <div className="w-24 h-24 bg-white rounded-full border-4 border-poke-blue/20 flex items-center justify-center overflow-hidden">{attackerSprite ? <img src={attackerSprite} className="w-20 h-20 object-contain scale-x-[-1]" /> : <Target className="text-gray-200" size={40} />}</div>
-            <span className="text-[10px] font-black uppercase text-poke-blue">Attacker</span>
+            <span className="text-[10px] font-black uppercase text-poke-blue">Attacker ({finalAtkValue})</span>
             {atkRank !== 0 && <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${atkRank > 0 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>Rank {atkRank > 0 ? `+${atkRank}` : atkRank}</span>}
           </div>
           <div className="z-10 text-poke-red font-black italic text-2xl animate-pulse">VS</div>
@@ -200,90 +226,88 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
                {defenderSprite ? <img src={defenderSprite} className="w-20 h-20 object-contain" /> : <Shield className="text-gray-200" size={40} />}
                <div className="absolute bottom-0 left-0 w-full h-2 bg-gray-200"><div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${100 - maxPercent}%` }}></div><div className="h-full bg-yellow-400 absolute top-0 right-0 opacity-50" style={{ width: `${maxPercent - minPercent}%` }}></div></div>
             </div>
-            <span className="text-[10px] font-black uppercase text-poke-red">Defender</span>
+            <span className="text-[10px] font-black uppercase text-poke-red">Defender ({finalDefValue})</span>
             {defRank !== 0 && <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${defRank > 0 ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'}`}>Rank {defRank > 0 ? `+${defRank}` : defRank}</span>}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-           <div className="relative">
-              <label className="text-[10px] font-black uppercase text-gray-400 mb-1 block italic underline">기술 검색 (한글/EN)</label>
-              <div className="relative">
-                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} />
-                 <input type="text" placeholder="예: 10만볼트, Surf..." value={moveSearch} onFocus={() => setActiveSearch('move')} onChange={(e) => setMoveSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 pl-9 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
-                 {isSearching === 'move' && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-poke-blue" size={14} />}
-              </div>
-              {activeSearch === 'move' && suggestions.length > 0 && (
-                <div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">
-                  {suggestions.map(p => (<button key={p.name} onClick={() => selectMove(p)} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between border-b border-gray-50"><span>{p.koName || p.name}</span><span className="text-gray-300">{p.name}</span></button>))}
-                </div>
-              )}
-           </div>
-           <div className="relative"><label className="text-[10px] font-black uppercase text-gray-400 mb-1 block italic underline">공격 포켓몬</label><div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} /><input type="text" placeholder="검색..." value={attackerSearch} onFocus={() => setActiveSearch('attacker')} onChange={(e) => setAttackerSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 pl-9 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
-           </div>
-           {activeSearch === 'attacker' && suggestions.length > 0 && (
-              <div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">
-                {suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'attacker')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span><span className="text-gray-300">{p.name}</span></button>))}
-              </div>
-           )}</div>
-           <div className="relative"><label className="text-[10px] font-black uppercase text-gray-400 mb-1 block italic underline">방어 포켓몬</label><div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={14} /><input type="text" placeholder="검색..." value={defenderSearch} onFocus={() => setActiveSearch('defender')} onChange={(e) => setDefenderSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 pl-9 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
-           </div>
-           {activeSearch === 'defender' && suggestions.length > 0 && (
-              <div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">
-                {suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'defender')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span><span className="text-gray-300">{p.name}</span></button>))}
-              </div>
-           )}</div>
-        </div>
-
+        {/* Elite Input Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-[10px] font-black uppercase mb-1">레벨</label><input type="number" value={level} onChange={(e) => setLevel(Number(e.target.value))} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs" /></div>
-                <div><label className="block text-[10px] font-black uppercase mb-1 text-red-500 underline italic">방어 HP</label><input type="number" value={maxHp} onChange={(e) => setMaxHp(Number(e.target.value))} className="w-full bg-red-50 p-2 rounded-xl font-bold text-xs border border-red-100" /></div>
+           <div className="lg:col-span-8 space-y-8">
+              {/* Search Section */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                 <div className="relative"><label className="text-[10px] font-black text-gray-400 mb-1 block uppercase italic underline">Move Search</label>
+                   <input type="text" placeholder="기술 검색..." value={moveSearch} onFocus={() => setActiveSearch('move')} onChange={(e) => setMoveSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
+                   {activeSearch === 'move' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectMove(p)} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] border-b border-gray-50"><span>{p.koName || p.name}</span></button>))}</div>)}
+                 </div>
+                 <div className="relative"><label className="text-[10px] font-black text-gray-400 mb-1 block uppercase italic underline">Attacker</label>
+                   <input type="text" placeholder="공격자 검색..." value={attackerSearch} onFocus={() => setActiveSearch('attacker')} onChange={(e) => setAttackerSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
+                   {activeSearch === 'attacker' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'attacker')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span></button>))}</div>)}
+                 </div>
+                 <div className="relative"><label className="text-[10px] font-black text-gray-400 mb-1 block uppercase italic underline">Defender</label>
+                   <input type="text" placeholder="방어자 검색..." value={defenderSearch} onFocus={() => setActiveSearch('defender')} onChange={(e) => setDefenderSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 rounded-xl font-bold text-xs focus:border-poke-blue outline-none" />
+                   {activeSearch === 'defender' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'defender')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span></button>))}</div>)}
+                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                 <div><label className="block text-[10px] font-black uppercase mb-1 flex items-center gap-1"><ShoppingBag size={10} /> 도구(Item)</label><select value={item} onChange={(e) => setItem(e.target.value)} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs">
-                    <option value="none">없음</option><option value="life-orb">생명의구슬 (x1.3)</option><option value="choice-band">구애머리띠 (x1.5)</option><option value="choice-specs">구애안경 (x1.5)</option><option value="expert-belt">달인의띠 (x1.2)</option><option value="assault-vest">돌격조끼 (특방x1.5)</option>
-                 </select></div>
-                 <div><label className="block text-[10px] font-black uppercase mb-1">특성(Ability)</label><select value={ability} onChange={(e) => setAbility(e.target.value)} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs">
-                    <option value="none">없음</option><option value="huge-power">천하장사 (x2.0)</option><option value="guts">근성 (x1.5)</option>
-                 </select></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                 <div><label className="block text-[10px] font-black uppercase mb-1 text-blue-500">공격 랭크</label><select value={atkRank} onChange={(e) => setAtkRank(Number(e.target.value))} className="w-full bg-blue-50 p-2 rounded-xl font-bold text-xs">{[6,5,4,3,2,1,0,-1,-2,-3,-4,-5,-6].map(r => <option key={r} value={r}>{r > 0 ? `+${r}` : r}</option>)}</select></div>
-                 <div><label className="block text-[10px] font-black uppercase mb-1 text-red-500">방어 랭크</label><select value={defRank} onChange={(e) => setDefRank(Number(e.target.value))} className="w-full bg-red-50 p-2 rounded-xl font-bold text-xs">{[6,5,4,3,2,1,0,-1,-2,-3,-4,-5,-6].map(r => <option key={r} value={r}>{r > 0 ? `+${r}` : r}</option>)}</select></div>
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                 <div><label className="block text-[10px] font-black uppercase mb-1 flex items-center gap-1"><CloudSun size={10} /> 날씨</label><select value={weather} onChange={(e) => setWeather(e.target.value as any)} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs"><option value="none">없음</option><option value="sun">쾌청</option><option value="rain">비</option><option value="sand">모래바람</option><option value="snow">설경</option></select></div>
-                 <div><label className="block text-[10px] font-black uppercase mb-1 flex items-center gap-1"><TerrainIcon size={10} /> 필드</label><select value={terrain} onChange={(e) => setTerrain(e.target.value as any)} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs"><option value="none">없음</option><option value="electric">일렉트릭</option><option value="grassy">그래스</option><option value="psychic">사이코</option><option value="misty">미스트</option></select></div>
+              {/* Stats Tuning */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-6 rounded-3xl border-2 border-gray-100">
+                 <div className="space-y-4">
+                    <h3 className="text-xs font-black text-poke-blue uppercase italic flex items-center gap-2"><Target size={14} /> Attacker Fine-tuning</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                       <div><label className="block text-[9px] font-black text-gray-400">Base</label><input type="number" value={atkBase} onChange={e => setAtkBase(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm" /></div>
+                       <div><label className="block text-[9px] font-black text-gray-400">IV</label><input type="number" value={atkIv} onChange={e => setAtkIv(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm" /></div>
+                       <div><label className="block text-[9px] font-black text-gray-400">EV</label><input type="number" value={atkEv} onChange={e => setAtkEv(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm" /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                       <div><label className="block text-[9px] font-black text-gray-400">Nature</label><select value={atkNature} onChange={e => setAtkNature(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm"><option value={1.1}>+10%</option><option value={1.0}>None</option><option value={0.9}>-10%</option></select></div>
+                       <div><label className="block text-[9px] font-black text-gray-400">Rank</label><select value={atkRank} onChange={e => setAtkRank(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm">{[6,5,4,3,2,1,0,-1,-2,-3,-4,-5,-6].map(r => <option key={r} value={r}>{r > 0 ? `+${r}` : r}</option>)}</select></div>
+                    </div>
+                 </div>
+                 <div className="space-y-4">
+                    <h3 className="text-xs font-black text-poke-red uppercase italic flex items-center gap-2"><Shield size={14} /> Defender Fine-tuning</h3>
+                    <div className="grid grid-cols-3 gap-2">
+                       <div><label className="block text-[9px] font-black text-gray-400">Base Def</label><input type="number" value={defBase} onChange={e => setDefBase(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm" /></div>
+                       <div><label className="block text-[9px] font-black text-gray-400">IV</label><input type="number" value={defIv} onChange={e => setDefIv(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm" /></div>
+                       <div><label className="block text-[9px] font-black text-gray-400">EV</label><input type="number" value={defEv} onChange={e => setDefEv(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm" /></div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                       <div><label className="block text-[9px] font-black text-gray-400">Base HP</label><input type="number" value={hpBase} onChange={e => setHpBase(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm" /></div>
+                       <div><label className="block text-[9px] font-black text-gray-400">Nature</label><select value={defNature} onChange={e => setDefNature(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm"><option value={1.1}>+10%</option><option value={1.0}>None</option><option value={0.9}>-10%</option></select></div>
+                       <div><label className="block text-[9px] font-black text-gray-400">Rank</label><select value={defRank} onChange={e => setDefRank(Number(e.target.value))} className="w-full p-2 bg-white rounded-lg font-bold text-xs shadow-sm">{[6,5,4,3,2,1,0,-1,-2,-3,-4,-5,-6].map(r => <option key={r} value={r}>{r > 0 ? `+${r}` : r}</option>)}</select></div>
+                    </div>
+                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                 <div><label className="block text-[10px] font-black uppercase mb-1">위력</label><input type="number" value={power} onChange={(e) => setPower(Number(e.target.value))} className="w-full bg-gray-100 p-2 rounded-xl font-bold text-xs" /></div>
-                 <div><label className="block text-[10px] font-black uppercase mb-1 text-poke-blue">기술 타입</label><select value={moveType} onChange={(e) => setMoveType(e.target.value)} className="w-full bg-blue-50 p-2 rounded-xl font-bold text-xs border border-blue-100">{['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Steel', 'Fairy', 'Dark'].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-              </div>
-              <div className="flex gap-2"><label className="flex-1 flex items-center gap-1 p-2 bg-gray-50 rounded-lg cursor-pointer"><input type="checkbox" checked={isStab} onChange={(e) => setIsStab(e.target.checked)} className="accent-poke-blue" /><span className="font-black text-[9px] uppercase">자속</span></label><label className="flex-1 flex items-center gap-1 p-2 bg-gray-50 rounded-lg cursor-pointer"><input type="checkbox" checked={isCritical} onChange={(e) => setIsCritical(e.target.checked)} className="accent-poke-blue" /><span className="font-black text-[9px] uppercase">급소</span></label></div>
-              <button onClick={saveToHistory} className="w-full py-2 bg-poke-blue text-white font-black rounded-xl text-xs uppercase italic hover:bg-blue-700 transition-colors">결과 저장</button>
-            </div>
-          </div>
+           </div>
 
-          <div className="lg:col-span-4 flex flex-col gap-4">
-            <div className="bg-poke-dark rounded-2xl p-6 text-white text-center shadow-inner relative overflow-hidden border-2 border-white/5">
-              <p className="text-[10px] font-black uppercase text-poke-yellow mb-2 tracking-widest italic">Damage Result</p>
-              <div className="text-3xl font-black italic mb-1 z-10 relative">{minDamage} ~ {maxDamage}</div>
-              <p className="text-[10px] font-black text-poke-red mb-3 animate-pulse uppercase">{getKOTurns()}</p>
-              <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden relative z-10"><div className="h-full bg-gradient-to-r from-red-500 to-green-500" style={{ width: `${maxPercent}%` }}></div></div>
-              <p className="text-[9px] font-bold text-gray-400 mt-2 italic">{minPercent}% ~ {maxPercent}% dealt</p>
-            </div>
-            <div className="bg-gray-50 rounded-2xl p-4 border-2 border-dashed border-gray-200 overflow-y-auto max-h-[140px]"><h3 className="text-[10px] font-black uppercase text-gray-400 mb-2 flex items-center gap-2"><History size={12} /> Recent</h3>
-              <div className="space-y-1">{history.map(item => (<div key={item.id} className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center"><div className="text-[8px] font-bold capitalize"><span className="text-poke-blue">{item.attacker}</span> vs <span className="text-poke-red">{item.defender}</span></div><div className="text-[8px] font-black">{item.min}-{item.max}</div></div>))}</div>
-            </div>
-          </div>
+           {/* Environment & Summary */}
+           <div className="lg:col-span-4 space-y-4">
+              <div className="bg-poke-dark rounded-3xl p-6 text-white text-center shadow-2xl relative overflow-hidden border-4 border-white/5">
+                 <p className="text-[10px] font-black uppercase text-poke-yellow mb-2 tracking-widest italic flex items-center justify-center gap-2"><Wand2 size={12}/> Analysis Result</p>
+                 <div className="text-4xl font-black italic mb-1 text-white">{minDamage} ~ {maxDamage}</div>
+                 <p className="text-[10px] font-black text-poke-red mb-3 uppercase tracking-tighter">{getKOTurns()}</p>
+                 <div className="w-full h-4 bg-white/10 rounded-full overflow-hidden relative border border-white/5">
+                    <div className="h-full bg-gradient-to-r from-red-500 via-yellow-400 to-green-500" style={{ width: `${maxPercent}%` }}></div>
+                 </div>
+                 <p className="text-[10px] font-bold text-gray-400 mt-2 italic">{minPercent}% ~ {maxPercent}%</p>
+                 <div className="mt-6 flex flex-wrap gap-2 justify-center">
+                    <div className="bg-white/10 px-2 py-1 rounded text-[9px] font-black uppercase">LV {level}</div>
+                    <div className="bg-white/10 px-2 py-1 rounded text-[9px] font-black uppercase">{moveType}</div>
+                    <div className="bg-white/10 px-2 py-1 rounded text-[9px] font-black uppercase">STAB: {isStab ? 'Y' : 'N'}</div>
+                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                 <select value={weather} onChange={e => setWeather(e.target.value as any)} className="bg-gray-100 p-2 rounded-xl font-bold text-[10px]"><option value="none">날씨: 없음</option><option value="sun">쾌청</option><option value="rain">비</option></select>
+                 <select value={terrain} onChange={e => setTerrain(e.target.value as any)} className="bg-gray-100 p-2 rounded-xl font-bold text-[10px]"><option value="none">필드: 없음</option><option value="electric">일렉트릭</option><option value="grassy">그래스</option></select>
+              </div>
+              <button onClick={saveToHistory} className="w-full py-3 bg-poke-blue text-white font-black rounded-2xl text-xs uppercase italic hover:bg-blue-700 transition-all shadow-lg">기록 저장 (Save)</button>
+              
+              <div className="bg-gray-50 rounded-2xl p-4 border-2 border-dashed border-gray-200 overflow-y-auto max-h-[140px]">
+                <h3 className="text-[10px] font-black uppercase text-gray-400 mb-2 flex items-center gap-2"><History size={12} /> Recent Calculations</h3>
+                <div className="space-y-1">{history.map(item => (<div key={item.id} className="bg-white p-1.5 rounded-lg shadow-sm border border-gray-100 flex justify-between items-center"><div className="text-[8px] font-bold capitalize"><span className="text-poke-blue">{item.attacker}</span> vs <span className="text-poke-red">{item.defender}</span></div><div className="text-[8px] font-black">{item.min}-{item.max}</div></div>))}</div>
+              </div>
+           </div>
         </div>
       </div>
     </div>
