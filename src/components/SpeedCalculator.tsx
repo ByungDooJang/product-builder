@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, ChevronLeft, Search, Loader2 } from 'lucide-react';
+import { Zap, ChevronLeft, Search, Loader2, Gauge } from 'lucide-react';
 import axios from 'axios';
 import { pokemonNameMap, getAnimatedSprite } from '../data/pokemonNames';
 import StatBars from './StatBars';
@@ -14,6 +14,22 @@ interface PokemonData {
   sprite?: string;
   baseStats?: any;
 }
+
+const speedBenchmarks = [
+  { speed: 337, name: 'Dragapult', cond: 'Timid Scarf' },
+  { speed: 267, name: 'Garchomp', cond: 'Jolly Scarf' },
+  { speed: 225, name: 'Dragapult', cond: 'Timid Max' },
+  { speed: 205, name: 'Chien-Pao', cond: 'Jolly Max' },
+  { speed: 200, name: 'Flutter Mane', cond: 'Timid Max' },
+  { speed: 178, name: 'Garchomp', cond: 'Jolly Max' },
+  { speed: 167, name: 'Urshifu', cond: 'Jolly Max' },
+  { speed: 156, name: 'Gholdengo', cond: 'Modest Max' },
+  { speed: 154, name: 'Dragonite', cond: 'Jolly Max' },
+  { speed: 122, name: 'Incineroar', cond: 'Adamant Max' },
+  { speed: 100, name: 'Snorlax', cond: 'Neutral 0' },
+  { speed: 80, name: 'Pelipper', cond: 'Neutral 0' },
+  { speed: 49, name: 'Amoonguss', cond: 'Quiet 0 IV' },
+];
 
 const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
   const [baseSpeed, setBaseSpeed] = useState<number>(100);
@@ -80,6 +96,15 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
     finally { setIsSearching(false); }
   };
 
+  const getNearbyBenchmarks = () => {
+    return speedBenchmarks
+      .map(b => ({ ...b, diff: finalSpeed - b.speed }))
+      .sort((a, b) => Math.abs(a.diff) - Math.abs(b.diff))
+      .slice(0, 3);
+  };
+
+  const nearby = getNearbyBenchmarks();
+
   return (
     <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       <button onClick={onBack} className="mb-8 flex items-center gap-2 text-white/70 hover:text-white transition-colors font-bold uppercase tracking-tight">
@@ -89,7 +114,7 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
       <div className="bg-white rounded-3xl p-8 border-8 border-poke-red shadow-[0_12px_0_0_rgba(238,21,21,1)] text-poke-dark">
         <div className="flex items-center gap-4 mb-8 border-b-4 border-gray-100 pb-4">
           <div className="bg-poke-red p-3 rounded-2xl text-white shadow-lg"><Zap size={32} fill="white" /></div>
-          <div><h2 className="text-3xl font-black uppercase tracking-tighter leading-none">스피드 계산기</h2><p className="text-gray-500 font-bold italic">Animated Master Edition!</p></div>
+          <div><h2 className="text-3xl font-black uppercase tracking-tighter leading-none">스피드 계산기</h2><p className="text-gray-500 font-bold italic">Tactical Speed Creep Engine Active!</p></div>
         </div>
 
         <div className="mb-8 relative">
@@ -100,7 +125,7 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
             {isSearching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-poke-red" size={20} />}
           </div>
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-20 w-full mt-2 bg-white border-4 border-poke-red rounded-xl shadow-xl overflow-hidden">
+            <div className="absolute z-20 w-full mt-2 bg-white border-4 border-poke-red rounded-xl shadow-xl overflow-hidden animate-in slide-in-from-top-2">
               {suggestions.map((p) => (
                 <button key={p.name} onClick={() => selectPokemon(p)} className="w-full p-4 text-left hover:bg-gray-50 font-bold capitalize border-b border-gray-100 flex justify-between">
                   <span>{p.koName || p.name}</span><span className="text-gray-400 text-xs uppercase italic">{p.name}</span>
@@ -136,6 +161,19 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
               <p className="text-xs font-black uppercase text-cyan-400 mb-1 tracking-widest italic animate-pulse">최종 스피드 실수치</p>
               <div className="text-6xl font-black italic">{finalSpeed}</div>
               <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-8 -mt-8"></div>
+            </div>
+
+            {/* Speed Creep Helper */}
+            <div className="bg-gray-50 rounded-2xl p-4 border-2 border-dashed border-gray-200">
+               <h3 className="text-[10px] font-black uppercase text-gray-400 mb-2 flex items-center gap-1"><Gauge size={12}/> Speed Benchmarks</h3>
+               <div className="space-y-1.5">
+                  {nearby.map((n, i) => (
+                     <div key={i} className="flex justify-between items-center text-[10px] font-bold">
+                        <span className="text-gray-500">{n.name} ({n.cond})</span>
+                        <span className={n.diff > 0 ? "text-green-500" : "text-red-500"}>{n.diff > 0 ? `+${n.diff} Fast` : `${n.diff} Slow`}</span>
+                     </div>
+                  ))}
+               </div>
             </div>
           </div>
         </div>
