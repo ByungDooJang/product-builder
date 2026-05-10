@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, ChevronLeft, Search, Loader2, Plus, X, AlertTriangle, Share2, FileDown, Download, Save, FolderOpen, Edit3 } from 'lucide-react';
+import { Users, ChevronLeft, Search, Loader2, Plus, X, AlertTriangle, Share2, FileDown, Download, Save, FolderOpen, Edit3, ClipboardCheck } from 'lucide-react';
 import axios from 'axios';
 import { pokemonNameMap } from '../data/pokemonNames';
 import html2canvas from 'html2canvas';
@@ -58,7 +58,7 @@ const typeMatchups: Record<string, { double: string[], half: string[], zero: str
 
 const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
   const [team, setTeam] = useState<TeamMember[]>([]);
-  const [teamTitle, setTeamTitle] = useState('My New Team');
+  const [teamTitle, setTeamTitle] = useState('My Tactical Team');
   const [savedTeams, setSavedTeams] = useState<SavedTeam[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -86,6 +86,13 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
 
   useEffect(() => { localStorage.setItem('poke_team', JSON.stringify(team)); }, [team]);
   useEffect(() => { localStorage.setItem('all_poke_teams', JSON.stringify(savedTeams)); }, [savedTeams]);
+
+  const exportToShowdown = () => {
+    if (team.length === 0) return;
+    const text = team.map(m => `${m.name.charAt(0).toUpperCase() + m.name.slice(1)}\nAbility: AbilityName\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Move 1\n- Move 2\n- Move 3\n- Move 4\n`).join('\n');
+    navigator.clipboard.writeText(text);
+    alert('쇼다운 텍스트 형식이 클립보드에 복사되었습니다!');
+  };
 
   const saveCurrentTeam = () => {
     if (team.length === 0) return;
@@ -151,12 +158,22 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
 
   const defResults = calculateCoverage();
 
+  const downloadTeamImage = async () => {
+    if (!cardRef.current) return;
+    const canvas = await html2canvas(cardRef.current, { backgroundColor: '#EE1515', scale: 2, useCORS: true });
+    const link = document.createElement('a');
+    link.download = `MyPokemonTeam.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
   return (
     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center mb-8">
         <button onClick={onBack} className="flex items-center gap-2 text-white/70 hover:text-white transition-colors font-bold uppercase"><ChevronLeft size={20} /> 메뉴</button>
         <div className="flex gap-2">
-          <button onClick={() => setShowManager(true)} className="bg-purple-600 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><FolderOpen size={16} /> 파티 저장소</button>
+          <button onClick={exportToShowdown} className="bg-gray-800 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><ClipboardCheck size={16} /> Export</button>
+          <button onClick={() => setShowManager(true)} className="bg-purple-600 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><FolderOpen size={16} /> 저장소</button>
           <button onClick={() => setShowImport(true)} className="bg-gray-700 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><FileDown size={16} /> Import</button>
           {team.length > 0 && <button onClick={shareTeam} className="bg-poke-blue text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg hover:scale-105 transition-transform"><Share2 size={16} /> 공유</button>}
         </div>
@@ -182,7 +199,6 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
                      </div>
                   ))}
                </div>
-               <button onClick={() => setShowManager(false)} className="w-full mt-6 py-3 bg-gray-200 text-gray-500 font-black rounded-xl uppercase italic">닫기</button>
             </div>
          </div>
       )}
@@ -201,7 +217,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
          </div>
       )}
 
-      <div className="bg-white rounded-3xl p-8 border-8 border-poke-red shadow-[0_12px_0_0_rgba(238,21,21,1)] text-poke-dark relative overflow-hidden">
+      <div ref={cardRef} className="bg-white rounded-3xl p-8 border-8 border-poke-red shadow-[0_12px_0_0_rgba(238,21,21,1)] text-poke-dark relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b-4 border-gray-100 pb-4">
           <div className="flex items-center gap-4">
              <div className="bg-poke-red p-3 rounded-2xl text-white shadow-lg"><Users size={32} /></div>
@@ -213,12 +229,15 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
                 <p className="text-gray-500 font-bold italic">Strategy Hub & Party Manager</p>
              </div>
           </div>
-          <button onClick={saveCurrentTeam} className="bg-poke-dark text-white px-6 py-2 rounded-xl font-black text-xs uppercase italic flex items-center justify-center gap-2 hover:bg-black transition-colors"><Save size={16} /> 이 파티 저장</button>
+          <div className="flex gap-2">
+             <button onClick={downloadTeamImage} className="bg-green-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase italic flex items-center gap-2 hover:bg-green-700 shadow-md hide-on-capture"><Download size={16} /> 이미지 저장</button>
+             <button onClick={saveCurrentTeam} className="bg-poke-dark text-white px-6 py-2 rounded-xl font-black text-xs uppercase italic flex items-center justify-center gap-2 hover:bg-black transition-colors hide-on-capture"><Save size={16} /> 파티 저장</button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
           <div className="lg:col-span-8">
-             <div className="relative mb-6">
+             <div className="relative mb-6 hide-on-capture">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input type="text" placeholder="포켓몬 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-50 border-4 border-transparent focus:border-poke-red outline-none p-4 pl-12 rounded-2xl font-bold transition-all shadow-inner" />
                 {suggestions.length > 0 && (
@@ -235,8 +254,8 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {team.map(m => (
                    <div key={m.id} className="relative bg-gray-50 p-4 rounded-2xl border-2 border-gray-100 flex flex-col items-center group animate-in zoom-in">
-                      <button onClick={() => setTeam(team.filter(x => x.id !== m.id))} className="absolute -top-2 -right-2 bg-white text-gray-400 rounded-full p-1 shadow-md border border-gray-100"><X size={16} /></button>
-                      <img src={m.sprite} className="w-20 h-20 object-contain mb-2" />
+                      <button onClick={() => setTeam(team.filter(x => x.id !== m.id))} className="absolute -top-2 -right-2 bg-white text-gray-400 rounded-full p-1 shadow-md border border-gray-100 hide-on-capture"><X size={16} /></button>
+                      <img src={m.sprite} className="w-20 h-20 object-contain mb-2" crossOrigin="anonymous" />
                       <span className="font-black text-[10px] text-center capitalize">{m.koName || m.name}</span>
                    </div>
                 ))}
@@ -257,10 +276,10 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
                       </div>
                    );
                 })}
-                {team.length === 0 && <p className="text-center py-10 text-xs text-gray-400 italic">파티를 구성하세요.</p>}
              </div>
           </div>
         </div>
+        <div className="absolute bottom-2 right-4 opacity-10 text-[8px] font-black uppercase italic">Pokémon Champions Battle Helper</div>
       </div>
     </div>
   );
