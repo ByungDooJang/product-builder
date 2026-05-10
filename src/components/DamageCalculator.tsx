@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Swords, ChevronLeft, Shield, Target, Search, Loader2, History, CloudSun, Zap as TerrainIcon, HelpCircle, X, ShoppingBag, Wand2, Star } from 'lucide-react';
 import axios from 'axios';
 import { pokemonNameMap, moveNameMap } from '../data/pokemonNames';
+import StatBars from './StatBars';
 
 interface DamageCalculatorProps {
   onBack: () => void;
@@ -57,6 +58,7 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   const [atkEv, setAtkEv] = useState<number>(252);
   const [atkNature, setAtkNature] = useState<number>(1.1);
   const [atkRank, setAtkRank] = useState<number>(0);
+  const [atkFullStats, setAtkFullStats] = useState<any>(null);
 
   // Defender Stats
   const [defBase, setDefBase] = useState<number>(100);
@@ -67,6 +69,7 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   const [hpBase, setHpBase] = useState<number>(100);
   const [hpIv, setHpIv] = useState<number>(31);
   const [hpEv, setHpEv] = useState<number>(0);
+  const [defFullStats, setDefFullStats] = useState<any>(null);
 
   // Modifiers
   const [item, setItem] = useState<string>('none');
@@ -113,11 +116,7 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
     let baseDamage = (((2 * level / 5 + 2) * power * finalAtk / finalDef) / 50 + 2);
     if ((weather === 'sun' && moveType === 'Fire') || (weather === 'rain' && moveType === 'Water')) baseDamage *= 1.5;
     if ((weather === 'sun' && moveType === 'Water') || (weather === 'rain' && moveType === 'Fire')) baseDamage *= 0.5;
-    if (terrain !== 'none') {
-       if ((terrain === 'electric' && moveType === 'Electric') || (terrain === 'grassy' && moveType === 'Grass') || (terrain === 'psychic' && moveType === 'Psychic')) baseDamage *= 1.3;
-       if (terrain === 'misty' && moveType === 'Dragon') baseDamage *= 0.5;
-    }
-
+    
     let stab = 1.0;
     const isBaseSTAB = attackerBaseTypes.includes(moveType);
     const isTeraSTAB = attackerTera === moveType;
@@ -128,10 +127,9 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
     const currentDefTypes = defenderTera === 'None' ? defenderBaseTypes : [defenderTera];
     currentDefTypes.forEach(defType => {
        const data = typeMatchups[defType];
-       if (!data) return;
-       if (data.double.includes(moveType)) effectiveness *= 2;
-       if (data.half.includes(moveType)) effectiveness *= 0.5;
-       if (data.zero.includes(moveType)) effectiveness *= 0;
+       if (data?.double.includes(moveType)) effectiveness *= 2;
+       if (data?.half.includes(moveType)) effectiveness *= 0.5;
+       if (data?.zero.includes(moveType)) effectiveness *= 0;
     });
 
     return Math.floor(baseDamage * stab * effectiveness * (isCritical ? 1.5 : 1.0) * random);
@@ -147,7 +145,6 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
     if (type === 'CS') { setAtkEv(252); setAtkNature(1.1); }
     if (type === 'HB') { setHpEv(252); setDefEv(252); setDefNature(1.1); }
     if (type === 'HD') { setHpEv(252); setDefEv(252); setDefNature(1.1); }
-    alert(`${type} 샘플 프리셋이 적용되었습니다!`);
   };
 
   const fetchSuggestions = async (term: string) => {
@@ -201,21 +198,28 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
       const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${p.name}`);
       const stats = response.data.stats;
       const typeList = response.data.types.map((t: any) => t.type.name.charAt(0).toUpperCase() + t.type.name.slice(1));
-      const spriteUrl = response.data.sprites.front_default;
+      const spriteUrl = response.data.sprites.other['official-artwork'].front_default || response.data.sprites.front_default;
+      
+      const s = {
+        hp: stats.find((s: any) => s.stat.name === 'hp').base_stat,
+        atk: stats.find((s: any) => s.stat.name === 'attack').base_stat,
+        def: stats.find((s: any) => s.stat.name === 'defense').base_stat,
+        spAtk: stats.find((s: any) => s.stat.name === 'special-attack').base_stat,
+        spDef: stats.find((s: any) => s.stat.name === 'special-defense').base_stat,
+        speed: stats.find((s: any) => s.stat.name === 'speed').base_stat
+      };
+
       if (target === 'attacker') {
-        const atk = stats.find((s: any) => s.stat.name === 'attack')?.base_stat || 100;
-        const spAtk = stats.find((s: any) => s.stat.name === 'special-attack')?.base_stat || 100;
-        setAtkBase(moveCategory === 'physical' ? atk : spAtk);
+        setAtkBase(moveCategory === 'physical' ? s.atk : s.spAtk);
         setAttackerBaseTypes(typeList);
         setAttackerSprite(spriteUrl);
+        setAtkFullStats(s);
       } else {
-        const def = stats.find((s: any) => s.stat.name === 'defense')?.base_stat || 100;
-        const spDef = stats.find((s: any) => s.stat.name === 'special-defense')?.base_stat || 100;
-        const hp = stats.find((s: any) => s.stat.name === 'hp')?.base_stat || 100;
-        setDefBase(moveCategory === 'physical' ? def : spDef);
-        setHpBase(hp);
+        setDefBase(moveCategory === 'physical' ? s.def : s.spDef);
+        setHpBase(s.hp);
         setDefenderBaseTypes(typeList);
         setDefenderSprite(spriteUrl);
+        setDefFullStats(s);
       }
     } catch (error) { alert('실패'); }
     finally { setIsSearching(null); }
@@ -229,35 +233,36 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
+    <div className="w-full max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
       <button onClick={onBack} className="mb-8 flex items-center gap-2 text-white/70 hover:text-white transition-colors font-bold uppercase"><ChevronLeft size={20} /> 메뉴</button>
 
-      <div className="bg-white rounded-3xl p-8 border-8 border-poke-blue shadow-[0_12px_0_0_rgba(59,76,202,1)] text-poke-dark">
+      <div className="bg-white rounded-3xl p-6 md:p-8 border-8 border-poke-blue shadow-[0_12px_0_0_rgba(59,76,202,1)] text-poke-dark">
         <div className="flex items-center justify-between mb-8 border-b-4 border-gray-100 pb-4">
           <div className="flex items-center gap-4">
-            <div className="bg-poke-blue p-3 rounded-2xl text-white shadow-lg"><Swords size={32} /></div>
-            <div><h2 className="text-3xl font-black uppercase tracking-tighter">데미지 계산기</h2><p className="text-gray-500 font-bold italic">Strategy Presets Active!</p></div>
+            <div className="bg-poke-blue p-3 rounded-2xl text-white shadow-lg animate-pulse"><Swords size={32} /></div>
+            <div><h2 className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none">데미지 시뮬레이터</h2><p className="text-[10px] md:text-xs text-gray-500 font-bold italic">Full Analytics 4.0</p></div>
           </div>
           <div className="flex gap-2">
-             <button onClick={() => applyPreset(moveCategory === 'physical' ? 'AS' : 'CS')} className="p-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded-full transition-all title='공격 프리셋'"><Wand2 size={24} /></button>
+             <button onClick={() => applyPreset('AS')} className="p-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded-full transition-all"><Wand2 size={24} /></button>
              <button onClick={() => setShowNatureRef(true)} className="p-2 bg-gray-100 text-gray-400 hover:text-poke-blue rounded-full transition-all"><HelpCircle size={24} /></button>
           </div>
         </div>
 
         {/* Battle Scene */}
-        <div className="flex items-center justify-between bg-gray-50 rounded-2xl p-6 mb-8 border-2 border-gray-100 shadow-inner relative overflow-hidden">
-          <div className="z-10 flex flex-col items-center gap-2">
-            <div className={`w-24 h-24 bg-white rounded-full border-4 ${attackerTera !== 'None' ? 'border-poke-yellow shadow-lg' : 'border-poke-blue/20'} flex items-center justify-center overflow-hidden`}>{attackerSprite ? <img src={attackerSprite} className="w-20 h-20 object-contain scale-x-[-1]" /> : <Target className="text-gray-200" size={40} />}</div>
-            <div className="flex flex-col items-center"><span className="text-[10px] font-black uppercase text-poke-blue italic">Atk ({finalAtkValue})</span><select value={attackerTera} onChange={e => setAttackerTera(e.target.value)} className="text-[8px] font-black p-1 bg-white border rounded"><option value="None">테라스탈 OFF</option>{types.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-          </div>
-          <div className="z-10 text-poke-red font-black italic text-2xl animate-pulse">VS</div>
-          <div className="z-10 flex flex-col items-center gap-2">
-            <div className={`w-24 h-24 bg-white rounded-full border-4 ${defenderTera !== 'None' ? 'border-poke-yellow shadow-lg' : 'border-poke-red/20'} flex items-center justify-center overflow-hidden relative`}>
-               {defenderSprite ? <img src={defenderSprite} className="w-20 h-20 object-contain" /> : <Shield className="text-gray-200" size={40} />}
-               <div className="absolute bottom-0 left-0 w-full h-2 bg-gray-200"><div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${100 - maxPercent}%` }}></div></div>
-            </div>
-            <div className="flex flex-col items-center"><span className="text-[10px] font-black uppercase text-poke-red italic">Def ({finalDefValue})</span><select value={defenderTera} onChange={e => setDefenderTera(e.target.value)} className="text-[8px] font-black p-1 bg-white border rounded"><option value="None">테라스탈 OFF</option>{types.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+           <div className="bg-gray-50 rounded-2xl p-4 border-2 border-gray-100 flex flex-col items-center">
+              <div className={`w-32 h-32 bg-white rounded-full border-4 ${attackerTera !== 'None' ? 'border-poke-yellow shadow-lg' : 'border-poke-blue/20'} flex items-center justify-center overflow-hidden mb-2`}>{attackerSprite ? <img src={attackerSprite} className="w-28 h-28 object-contain scale-x-[-1]" /> : <Target className="text-gray-200" size={40} />}</div>
+              <select value={attackerTera} onChange={e => setAttackerTera(e.target.value)} className="text-[9px] font-black p-1 bg-white border rounded mb-2"><option value="None">Tera OFF</option>{types.map(t => <option key={t} value={t}>Tera: {t}</option>)}</select>
+              {atkFullStats && <StatBars stats={atkFullStats} />}
+           </div>
+           <div className="bg-gray-50 rounded-2xl p-4 border-2 border-gray-100 flex flex-col items-center">
+              <div className={`w-32 h-32 bg-white rounded-full border-4 ${defenderTera !== 'None' ? 'border-poke-yellow shadow-lg' : 'border-poke-red/20'} flex items-center justify-center overflow-hidden relative mb-2`}>
+                 {defenderSprite ? <img src={defenderSprite} className="w-28 h-28 object-contain" /> : <Shield className="text-gray-200" size={40} />}
+                 <div className="absolute bottom-0 left-0 w-full h-2 bg-gray-200"><div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${100 - maxPercent}%` }}></div></div>
+              </div>
+              <select value={defenderTera} onChange={e => setDefenderTera(e.target.value)} className="text-[9px] font-black p-1 bg-white border rounded mb-2"><option value="None">Tera OFF</option>{types.map(t => <option key={t} value={t}>Tera: {t}</option>)}</select>
+              {defFullStats && <StatBars stats={defFullStats} />}
+           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -267,14 +272,14 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
                    {activeSearch === 'move' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectMove(p)} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span></button>))}</div>)}
                  </div>
                  <div className="relative"><input type="text" placeholder="공격자..." value={attackerSearch} onFocus={() => setActiveSearch('attacker')} onChange={(e) => setAttackerSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 rounded-xl font-bold text-xs" />
-                   {activeSearch === 'attacker' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'attacker')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span></button>))}</div>)}
+                   {activeSearch === 'attacker' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'attacker')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px]"><span>{p.koName || p.name}</span></button>))}</div>)}
                  </div>
                  <div className="relative"><input type="text" placeholder="방어자..." value={defenderSearch} onFocus={() => setActiveSearch('defender')} onChange={(e) => setDefenderSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 rounded-xl font-bold text-xs" />
-                   {activeSearch === 'defender' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'defender')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span></button>))}</div>)}
+                   {activeSearch === 'defender' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'defender')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px]"><span>{p.koName || p.name}</span></button>))}</div>)}
                  </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-5 rounded-2xl border border-gray-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-5 rounded-2xl border border-gray-100 shadow-inner">
                  <div className="space-y-2">
                     <h4 className="text-[10px] font-black uppercase text-poke-blue italic">Attacker Fine-tuning</h4>
                     <div className="grid grid-cols-3 gap-1">
@@ -295,17 +300,16 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
            </div>
 
            <div className="lg:col-span-4 space-y-4">
-              <div className="bg-poke-dark rounded-2xl p-5 text-white text-center shadow-xl border border-white/5">
-                 <p className="text-[9px] font-black uppercase text-poke-yellow mb-1 tracking-widest italic">Simulation Result</p>
+              <div className="bg-poke-dark rounded-3xl p-5 text-white text-center shadow-2xl border border-white/5 relative overflow-hidden">
+                 <p className="text-[9px] font-black uppercase text-poke-yellow mb-1 tracking-widest italic underline decoration-poke-red decoration-2">Battle Insights</p>
                  <div className="text-3xl font-black italic mb-0.5">{minDamage} ~ {maxDamage}</div>
-                 <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden mb-2"><div className="h-full bg-gradient-to-r from-red-500 via-yellow-400 to-green-500 shadow-[0_0_10px_rgba(255,203,5,0.3)]" style={{ width: `${maxPercent}%` }}></div></div>
-                 <p className="text-[9px] font-bold text-gray-400 italic">{minPercent}% ~ {maxPercent}% Deals</p>
+                 <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden mb-2 shadow-inner"><div className="h-full bg-gradient-to-r from-red-500 via-yellow-400 to-green-500 shadow-[0_0_10px_rgba(255,203,5,0.3)]" style={{ width: `${maxPercent}%` }}></div></div>
+                 <p className="text-[9px] font-bold text-gray-400 italic leading-none">{minPercent}% ~ {maxPercent}% Deals</p>
+                 <div className="mt-4 py-2 border-y border-white/5">
+                    <span className="text-[10px] font-black text-poke-red animate-pulse uppercase italic">Estimated KO: {Math.ceil(finalHpValue/minDamage)} Turns</span>
+                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                 <select value={item} onChange={e => setItem(e.target.value)} className="bg-gray-100 p-2 rounded-xl font-bold text-[9px] uppercase"><option value="none">도구: 없음</option><option value="life-orb">생구</option><option value="choice-band">머리띠</option><option value="assault-vest">돌조</option></select>
-                 <select value={ability} onChange={e => setAbility(e.target.value)} className="bg-gray-100 p-2 rounded-xl font-bold text-[9px] uppercase"><option value="none">특성: 없음</option><option value="huge-power">천하장사</option><option value="guts">근성</option></select>
-              </div>
-              <button onClick={saveToHistory} className="w-full py-3 bg-poke-blue text-white font-black rounded-2xl text-xs uppercase italic hover:bg-blue-700 shadow-md">기록 저장 (Save)</button>
+              <button onClick={saveToHistory} className="w-full py-3 bg-poke-blue text-white font-black rounded-2xl text-xs uppercase italic hover:bg-blue-700 shadow-lg transition-all active:scale-95">결과 저장 (Save Stats)</button>
            </div>
         </div>
       </div>
