@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, ChevronLeft, Search, Loader2, Plus, X, AlertTriangle, Share2, Save, FolderOpen, Edit3, Sparkles, Target, Zap } from 'lucide-react';
+import { Users, ChevronLeft, Search, Loader2, Plus, X, AlertTriangle, Share2, Save, FolderOpen, Edit3, Sparkles, Target, Zap, QrCode } from 'lucide-react';
 import axios from 'axios';
 import { pokemonNameMap, getAnimatedSprite } from '../data/pokemonNames';
 import html2canvas from 'html2canvas';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface TeamMember {
   id: string;
@@ -64,10 +65,16 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showManager, setShowManager] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const toBase64 = (str: string) => btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode(parseInt(p1, 16))));
   const fromBase64 = (str: string) => decodeURIComponent(Array.prototype.map.call(atob(str), (c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+
+  const getShareUrl = () => {
+    const encoded = toBase64(JSON.stringify(team));
+    return `${window.location.origin}${window.location.pathname}#team=${encoded}`;
+  };
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -106,8 +113,8 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
   const getDefensiveCores = () => {
     const t = team.map(m => m.types).flat();
     const cores = [];
-    if (t.includes('Fire') && t.includes('Water') && t.includes('Grass')) cores.push('FWG (Fire-Water-Grass)');
-    if (t.includes('Dragon') && t.includes('Steel') && t.includes('Fairy')) cores.push('DFS (Dragon-Fairy-Steel)');
+    if (t.includes('Fire') && t.includes('Water') && t.includes('Grass')) cores.push('FWG');
+    if (t.includes('Dragon') && t.includes('Steel') && t.includes('Fairy')) cores.push('DFS');
     return cores;
   };
 
@@ -138,8 +145,45 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center mb-8">
         <button onClick={onBack} className="flex items-center gap-2 text-white/70 hover:text-white transition-colors font-bold uppercase"><ChevronLeft size={20} /> 메뉴</button>
-        <button onClick={() => setShowManager(true)} className="bg-purple-600 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><FolderOpen size={16} /> 저장소</button>
+        <div className="flex gap-2">
+           <button onClick={() => setShowQR(true)} className="bg-white text-poke-dark px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><QrCode size={16} /> QR 공유</button>
+           <button onClick={() => setShowManager(true)} className="bg-purple-600 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 shadow-lg"><FolderOpen size={16} /> 저장소</button>
+        </div>
       </div>
+
+      {/* QR Modal */}
+      {showQR && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in" onClick={() => setShowQR(false)}>
+            <div className="bg-white rounded-3xl p-10 flex flex-col items-center gap-6 shadow-2xl border-8 border-poke-yellow" onClick={e => e.stopPropagation()}>
+               <h3 className="text-xl font-black text-poke-dark uppercase italic">Team QR Code</h3>
+               <div className="p-4 bg-white rounded-2xl shadow-inner border-2 border-gray-100">
+                  <QRCodeSVG value={getShareUrl()} size={200} />
+               </div>
+               <p className="text-xs font-bold text-gray-400 text-center leading-relaxed">다른 트레이너가 카메라로 스캔하면<br/>이 파티 구성을 즉시 불러옵니다.</p>
+               <button onClick={() => setShowQR(false)} className="w-full py-3 bg-poke-dark text-white font-black rounded-xl uppercase italic">닫기 (Close)</button>
+            </div>
+         </div>
+      )}
+
+      {/* Team Manager Modal */}
+      {showManager && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in" onClick={() => setShowManager(false)}>
+            <div className="bg-white rounded-3xl p-8 w-full max-w-lg border-8 border-purple-500 shadow-2xl" onClick={e => e.stopPropagation()}>
+               <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-black text-poke-dark uppercase italic flex items-center gap-2"><FolderOpen /> 파티 저장소</h3><button onClick={() => setShowManager(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={24} /></button></div>
+               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                  {savedTeams.map(t => (
+                     <div key={t.id} className="bg-gray-50 p-4 rounded-2xl border-2 border-gray-100 flex items-center justify-between hover:border-purple-200 cursor-pointer" onClick={() => { setTeam(t.members); setTeamTitle(t.title); setShowManager(false); }}>
+                        <div className="flex-1">
+                           <p className="font-black text-sm text-poke-dark">{t.title}</p>
+                           <p className="text-[10px] text-gray-400">{t.members.length}마리 / {new Date(t.updatedAt).toLocaleDateString()}</p>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); setSavedTeams(savedTeams.filter(x => x.id !== t.id)); }} className="text-gray-300 hover:text-red-500 p-2"><X size={18} /></button>
+                     </div>
+                  ))}
+               </div>
+            </div>
+         </div>
+      )}
 
       <div ref={cardRef} className="bg-white rounded-3xl p-8 border-8 border-poke-red shadow-[0_12px_0_0_rgba(238,21,21,1)] text-poke-dark relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b-4 border-gray-100 pb-4">
@@ -147,7 +191,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
              <div className="bg-poke-red p-3 rounded-2xl text-white shadow-lg"><Users size={32} /></div>
              <div>
                 <input type="text" value={teamTitle} onChange={e => setTeamTitle(e.target.value)} className="text-2xl font-black uppercase tracking-tighter outline-none bg-transparent focus:bg-gray-50 rounded px-1 border-b-2 border-transparent focus:border-poke-red w-48" />
-                <p className="text-gray-500 font-bold italic text-xs">Tactical AI Core Detection Active!</p>
+                <p className="text-gray-500 font-bold italic text-xs">E-Sports Pro Synergy Engine Active!</p>
              </div>
           </div>
           {cores.length > 0 && (
@@ -167,6 +211,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
                       <span className="font-black text-[10px] text-center capitalize">{m.koName || m.name}</span>
                    </div>
                 ))}
+                {[...Array(6 - team.length)].map((_, i) => (<div key={i} className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl min-h-[140px] flex items-center justify-center opacity-40 font-bold text-gray-400 italic text-xs">Empty</div>))}
              </div>
           </div>
 
@@ -189,9 +234,18 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
         <div className="absolute bottom-2 right-4 opacity-10 text-[8px] font-black uppercase italic">Pokémon Champions Battle Helper</div>
       </div>
       
-      <div className="mt-8 relative hide-on-capture">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input type="text" placeholder="포켓몬 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-50 border-4 border-transparent focus:border-poke-red outline-none p-4 pl-12 rounded-2xl font-bold transition-all shadow-inner" />
+      <div className="mt-8 relative hide-on-capture flex gap-4">
+          <div className="relative flex-grow">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input type="text" placeholder="포켓몬 검색하여 파티에 추가..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-50 border-4 border-transparent focus:border-poke-red outline-none p-4 pl-12 rounded-2xl font-bold transition-all shadow-inner" />
+          </div>
+          <button onClick={() => { const updated = [{ id: Date.now().toString(), title: teamTitle, members: [...team], updatedAt: Date.now() }, ...savedTeams.filter(t => t.title !== teamTitle)].slice(0, 10); setSavedTeams(updated); alert('저장됨!'); }} className="bg-poke-dark text-white px-8 rounded-2xl font-black uppercase italic shadow-lg hover:bg-black transition-colors">Save</button>
+          
+          {suggestions.length > 0 && (
+            <div className="absolute z-30 w-full mt-2 top-full bg-white border-4 border-poke-red rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2">
+              {suggestions.map(p => (<button key={p.name} onClick={() => addPokemon(p)} className="w-full p-4 text-left hover:bg-yellow-50 font-bold capitalize flex justify-between border-b border-gray-100"><span>{p.koName || p.name}</span><Plus size={20} className="text-poke-red" /></button>))}
+            </div>
+          )}
       </div>
     </div>
   );
