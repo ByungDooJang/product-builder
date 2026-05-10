@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Sparkles, Trophy, RotateCcw, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, Sparkles, Trophy, RotateCcw, Loader2, Download } from 'lucide-react';
 import axios from 'axios';
+import html2canvas from 'html2canvas';
 
 interface Question {
   id: number;
@@ -98,6 +99,7 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
   const [result, setResult] = useState<string | null>(null);
   const [resultSprite, setResultSprite] = useState<string | null>(null);
   const [isLoadingResult, setIsLoadingResult] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const handleAnswer = (type: string) => {
     const newAnswers = [...answers, type];
@@ -134,6 +136,19 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
     }
   };
 
+  const downloadImage = async () => {
+    if (!cardRef.current) return;
+    const canvas = await html2canvas(cardRef.current, {
+       backgroundColor: '#FFCB05',
+       scale: 2,
+       useCORS: true,
+    });
+    const link = document.createElement('a');
+    link.download = `TrainerCard_${result}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+
   const resetTest = () => {
     setCurrentStep(0);
     setAnswers([]);
@@ -155,7 +170,7 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
     const pokemon = results[result] || results['ENFP'];
     return (
       <div className="w-full max-w-2xl animate-in zoom-in duration-500">
-        <div className="bg-white rounded-3xl p-10 border-8 border-poke-yellow shadow-[0_12px_0_0_rgba(255,203,5,1)] text-poke-dark text-center">
+        <div ref={cardRef} className="bg-white rounded-3xl p-10 border-8 border-poke-yellow shadow-[0_12px_0_0_rgba(255,203,5,1)] text-poke-dark text-center relative overflow-hidden">
           <div className="inline-block bg-poke-yellow p-4 rounded-full mb-6 shadow-lg animate-bounce">
             <Trophy size={48} className="text-poke-dark" />
           </div>
@@ -164,7 +179,7 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
           <div className="flex justify-center mb-6 relative">
             <div className="absolute inset-0 bg-poke-yellow/10 rounded-full blur-3xl animate-pulse"></div>
             {resultSprite ? (
-              <img src={resultSprite} alt={pokemon.name} className="w-64 h-64 object-contain relative z-10 drop-shadow-2xl" />
+              <img src={resultSprite} alt={pokemon.name} className="w-64 h-64 object-contain relative z-10 drop-shadow-2xl" crossOrigin="anonymous" />
             ) : (
               <div className="text-9xl relative z-10">{pokemon.icon}</div>
             )}
@@ -178,24 +193,34 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
           <p className="text-lg font-bold text-gray-600 mb-8 leading-relaxed">
             {pokemon.desc}
           </p>
-          
-          <div className="flex flex-col gap-4">
-            <button 
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({
-                    title: '포켓몬 트레이너 성향 테스트 결과',
-                    text: `나의 트레이너 유형은 [${result}]형, 파트너 포켓몬은 [${pokemon.name}]입니다! 여러분도 확인해보세요.`,
-                    url: window.location.href,
-                  });
-                } else {
-                  alert('공유하기를 지원하지 않는 브라우저입니다. 링크를 복사해주세요!');
-                }
-              }}
-              className="flex items-center justify-center gap-2 w-full py-4 bg-poke-blue text-white font-black rounded-2xl uppercase italic hover:scale-105 transition-transform shadow-lg"
-            >
-              <Sparkles size={20} /> 결과 공유하기
-            </button>
+          <div className="absolute bottom-2 right-4 opacity-10 text-[8px] font-black uppercase italic">Pokémon Champions Battle Helper</div>
+        </div>
+        
+        <div className="flex flex-col gap-4 mt-8">
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({
+                      title: '포켓몬 트레이너 성향 테스트 결과',
+                      text: `나의 트레이너 유형은 [${result}]형, 파트너 포켓몬은 [${pokemon.name}]입니다! 여러분도 확인해보세요.`,
+                      url: window.location.href,
+                    });
+                  } else {
+                    alert('공유하기를 지원하지 않는 브라우저입니다. 링크를 복사해주세요!');
+                  }
+                }}
+                className="flex items-center justify-center gap-2 py-4 bg-poke-blue text-white font-black rounded-2xl uppercase italic hover:scale-105 transition-transform shadow-lg"
+              >
+                <Sparkles size={20} /> 공유
+              </button>
+              <button 
+                onClick={downloadImage}
+                className="flex items-center justify-center gap-2 py-4 bg-green-500 text-white font-black rounded-2xl uppercase italic hover:scale-105 transition-transform shadow-lg"
+              >
+                <Download size={20} /> 이미지 저장
+              </button>
+            </div>
             <button 
               onClick={resetTest}
               className="flex items-center justify-center gap-2 w-full py-4 bg-poke-dark text-white font-black rounded-2xl uppercase italic hover:scale-105 transition-transform"
@@ -208,7 +233,6 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
             >
               홈으로 돌아가기
             </button>
-          </div>
         </div>
       </div>
     );
