@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
-import { ShieldAlert, ChevronLeft, Swords, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldAlert, ChevronLeft, Swords, ShieldCheck, Search, Loader2, X } from 'lucide-react';
+import axios from 'axios';
+import { pokemonNameMap } from '../data/pokemonNames';
 
 interface TypeMatchupProps {
   onBack: () => void;
+}
+
+interface PokemonData {
+  name: string;
+  koName?: string;
 }
 
 const types = [
@@ -49,6 +56,10 @@ const matchupData: Record<string, { double: string[], half: string[], zero: stri
 
 const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [suggestions, setSuggestions] = useState<PokemonData[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const toggleType = (typeName: string) => {
     if (selectedTypes.includes(typeName)) {
@@ -58,12 +69,54 @@ const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
     }
   };
 
+  const fetchSuggestions = async () => {
+    if (searchTerm.length < 1) {
+      setSuggestions([]);
+      return;
+    }
+    const koMatches = Object.entries(pokemonNameMap)
+      .filter(([ko]) => ko.includes(searchTerm))
+      .map(([ko, en]) => ({ name: en, koName: ko }));
+
+    try {
+      const response = await axios.get('https://pokeapi.co/api/v2/pokemon?limit=1000');
+      const enMatches = response.data.results
+        .filter((p: any) => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        .map((p: any) => ({ name: p.name }));
+      
+      const combinedMap = new Map();
+      [...koMatches, ...enMatches].forEach(p => {
+        if (!combinedMap.has(p.name)) combinedMap.set(p.name, p);
+        else if (p.koName) combinedMap.set(p.name, p);
+      });
+      setSuggestions(Array.from(combinedMap.values()).slice(0, 5));
+    } catch (error) { console.error(error); }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const selectPokemon = async (p: PokemonData) => {
+    setIsSearching(true);
+    setSearchTerm(p.koName || p.name);
+    setShowSuggestions(false);
+    try {
+      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${p.name}`);
+      const typesData = response.data.types.map((t: any) => t.type.name.charAt(0).toUpperCase() + t.type.name.slice(1));
+      setSelectedTypes(typesData);
+    } catch (error) { alert('실패'); }
+    finally { setIsSearching(false); }
+  };
+
   const calculateMatchups = () => {
     const scores: Record<string, number> = {};
     types.forEach(t => scores[t.name] = 1);
 
     selectedTypes.forEach(typeName => {
       const data = matchupData[typeName];
+      if (!data) return;
       data.double.forEach(t => scores[t] *= 2);
       data.half.forEach(t => scores[t] *= 0.5);
       data.zero.forEach(t => scores[t] *= 0);
@@ -87,18 +140,48 @@ const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
       </button>
 
       <div className="bg-white rounded-3xl p-8 border-8 border-poke-yellow shadow-[0_12px_0_0_rgba(255,203,5,1)] text-poke-dark">
-        <div className="flex items-center gap-4 mb-8 border-b-4 border-gray-100 pb-4">
-          <div className="bg-poke-yellow p-3 rounded-2xl text-poke-dark shadow-lg">
-            <ShieldAlert size={32} />
+        <div className="flex items-center justify-between border-b-4 border-gray-100 pb-4 mb-8">
+          <div className="flex items-center gap-4">
+            <div className="bg-poke-yellow p-3 rounded-2xl text-poke-dark shadow-lg">
+              <ShieldAlert size={32} />
+            </div>
+            <div>
+              <h2 className="text-3xl font-black uppercase tracking-tighter">타입 상성 체크</h2>
+              <p className="text-gray-500 font-bold">포켓몬의 약점과 강점을 분석하세요!</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-3xl font-black uppercase tracking-tighter">타입 상성 체크</h2>
-            <p className="text-gray-500 font-bold">포켓몬의 약점과 강점을 분석하세요!</p>
+          {selectedTypes.length > 0 && (
+            <button onClick={() => {setSelectedTypes([]); setSearchTerm('');}} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+              <X size={20} className="text-gray-500" />
+            </button>
+          )}
+        </div>
+
+        <div className="mb-8 relative">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input 
+              type="text" 
+              placeholder="포켓몬 검색하여 타입 자동 선택..." 
+              value={searchTerm}
+              onChange={(e) => {setSearchTerm(e.target.value); setShowSuggestions(true);}}
+              className="w-full bg-gray-100 border-4 border-transparent focus:border-poke-yellow outline-none p-3 pl-12 rounded-xl font-bold transition-all"
+            />
+            {isSearching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-poke-yellow" size={20} />}
           </div>
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute z-20 w-full mt-2 bg-white border-4 border-poke-yellow rounded-xl shadow-xl overflow-hidden">
+              {suggestions.map(p => (
+                <button key={p.name} onClick={() => selectPokemon(p)} className="w-full p-3 text-left hover:bg-yellow-50 font-bold capitalize flex justify-between border-b last:border-none border-gray-100">
+                  <span>{p.koName || p.name}</span>
+                  {p.koName && <span className="text-gray-300 text-xs">{p.name}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {/* Type Selection */}
           <div>
             <h3 className="text-sm font-black uppercase mb-4 text-gray-400 tracking-widest italic">타입 선택 (최대 2개)</h3>
             <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-3 gap-2">
@@ -127,11 +210,9 @@ const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
             )}
           </div>
 
-          {/* Analysis Results */}
           <div className="space-y-6">
             {selectedTypes.length > 0 && (
               <>
-                {/* Weaknesses */}
                 <div>
                   <h3 className="flex items-center gap-2 text-sm font-black uppercase mb-3 text-poke-red">
                     <Swords size={16} /> 약점 (데미지 많이 받음)
@@ -148,7 +229,6 @@ const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
                   </div>
                 </div>
 
-                {/* Resistances */}
                 <div>
                   <h3 className="flex items-center gap-2 text-sm font-black uppercase mb-3 text-green-600">
                     <ShieldCheck size={16} /> 반감 (데미지 적게 받음)
@@ -165,7 +245,6 @@ const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
                   </div>
                 </div>
 
-                {/* Immunities */}
                 {immunities.length > 0 && (
                   <div>
                     <h3 className="text-sm font-black uppercase mb-3 text-gray-400 italic">무효 (데미지 없음)</h3>
