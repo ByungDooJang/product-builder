@@ -1,17 +1,29 @@
-import React from 'react';
-import { Zap, ChevronLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Zap, ChevronLeft, Search, Loader2 } from 'lucide-react';
+import axios from 'axios';
 
 interface SpeedCalculatorProps {
   onBack: () => void;
 }
 
+interface PokemonData {
+  name: string;
+  url: string;
+}
+
 const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
-  const [baseSpeed, setBaseSpeed] = React.useState<number>(100);
-  const [level, setLevel] = React.useState<number>(50);
-  const [iv, setIv] = React.useState<number>(31);
-  const [ev, setEv] = React.useState<number>(0);
-  const [nature, setNature] = React.useState<number>(1.0);
-  const [modifier, setModifier] = React.useState<number>(1.0);
+  const [baseSpeed, setBaseSpeed] = useState<number>(100);
+  const [level, setLevel] = useState<number>(50);
+  const [iv, setIv] = useState<number>(31);
+  const [ev, setEv] = useState<number>(0);
+  const [nature, setNature] = useState<number>(1.0);
+  const [modifier, setModifier] = useState<number>(1.0);
+
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [suggestions, setSuggestions] = useState<PokemonData[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Speed Formula: ((Base * 2 + IV + (EV/4)) * Level / 100 + 5) * Nature * Modifiers
   const calculateSpeed = () => {
@@ -20,6 +32,46 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
   };
 
   const finalSpeed = calculateSpeed();
+
+  // Search for Pokémon
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (searchTerm.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+      try {
+        // Fetch all pokemon names (cached or limited)
+        const response = await axios.get('https://pokeapi.co/api/v2/pokemon?limit=1000');
+        const matches = response.data.results.filter((p: PokemonData) => 
+          p.name.toLowerCase().includes(searchTerm.toLowerCase())
+        ).slice(0, 5);
+        setSuggestions(matches);
+      } catch (error) {
+        console.error('Error fetching suggestions', error);
+      }
+    };
+
+    const timer = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const selectPokemon = async (name: string) => {
+    setIsSearching(true);
+    setSearchTerm(name);
+    setShowSuggestions(false);
+    try {
+      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${name}`);
+      const speedStat = response.data.stats.find((s: any) => s.stat.name === 'speed');
+      if (speedStat) {
+        setBaseSpeed(speedStat.base_stat);
+      }
+    } catch (error) {
+      alert('포켓몬 정보를 가져오는데 실패했습니다.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -41,6 +93,42 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
           </div>
         </div>
 
+        {/* Search Bar */}
+        <div className="mb-8 relative">
+          <label className="block text-sm font-black uppercase mb-1">포켓몬 검색 (English)</label>
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input 
+              type="text" 
+              placeholder="예: Pikachu, Garchomp..." 
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setShowSuggestions(true);
+              }}
+              className="w-full bg-gray-100 border-4 border-transparent focus:border-poke-red outline-none p-3 pl-12 rounded-xl font-bold transition-all"
+            />
+            {isSearching && (
+              <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-poke-red" size={20} />
+            )}
+          </div>
+
+          {/* Suggestions Dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute z-20 w-full mt-2 bg-white border-4 border-poke-red rounded-xl shadow-xl overflow-hidden">
+              {suggestions.map((p) => (
+                <button
+                  key={p.name}
+                  onClick={() => selectPokemon(p.name)}
+                  className="w-full p-4 text-left hover:bg-gray-50 font-bold capitalize border-b last:border-none border-gray-100"
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Inputs */}
           <div className="space-y-4">
@@ -53,6 +141,7 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
                 className="w-full bg-gray-100 border-4 border-transparent focus:border-poke-red outline-none p-3 rounded-xl font-bold transition-all"
               />
             </div>
+...
             
             <div className="grid grid-cols-2 gap-4">
               <div>
