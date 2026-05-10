@@ -139,6 +139,22 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
           
           <div className="flex flex-col gap-4">
             <button 
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({
+                    title: '포켓몬 트레이너 성향 테스트 결과',
+                    text: `나의 트레이너 유형은 [${result}]형, 파트너 포켓몬은 [${pokemon.name}]입니다! 여러분도 확인해보세요.`,
+                    url: window.location.href,
+                  });
+                } else {
+                  alert('공유하기를 지원하지 않는 브라우저입니다. 링크를 복사해주세요!');
+                }
+              }}
+              className="flex items-center justify-center gap-2 w-full py-4 bg-poke-blue text-white font-black rounded-2xl uppercase italic hover:scale-105 transition-transform"
+            >
+              <Sparkles size={20} /> 결과 공유하기
+            </button>
+            <button 
               onClick={resetTest}
               className="flex items-center justify-center gap-2 w-full py-4 bg-poke-dark text-white font-black rounded-2xl uppercase italic hover:scale-105 transition-transform"
             >
