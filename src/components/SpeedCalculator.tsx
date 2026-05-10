@@ -14,6 +14,7 @@ interface PokemonData {
 
 const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
   const [baseSpeed, setBaseSpeed] = useState<number>(100);
+  const [sprite, setSprite] = useState<string | null>(null);
   const [level, setLevel] = useState<number>(50);
   const [iv, setIv] = useState<number>(31);
   const [ev, setEv] = useState<number>(0);
@@ -80,9 +81,11 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
     try {
       const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${p.name}`);
       const speedStat = response.data.stats.find((s: any) => s.stat.name === 'speed');
+      const spriteUrl = response.data.sprites.other['official-artwork'].front_default || response.data.sprites.front_default;
       if (speedStat) {
         setBaseSpeed(speedStat.base_stat);
       }
+      setSprite(spriteUrl);
     } catch (error) {
       alert('데이터 로딩 실패');
     } finally {
@@ -148,8 +151,13 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Inputs */}
+          {/* Inputs & Sprite */}
           <div className="space-y-4">
+            {sprite && (
+              <div className="flex justify-center mb-4 bg-gray-50 rounded-2xl p-4 border-2 border-gray-100 animate-in zoom-in duration-300">
+                <img src={sprite} alt="Pokemon" className="w-32 h-32 object-contain" />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-black uppercase mb-1">스피드 종족값 (Base)</label>
               <input 
@@ -195,7 +203,7 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
           </div>
 
           {/* Result & Modifiers */}
-          <div className="flex flex-col justify-between space-y-4">
+          <div className="flex flex-col justify-between space-y-4 text-center md:text-left">
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-black uppercase mb-1">성격 (Nature)</label>
@@ -230,13 +238,12 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
                 <p className="text-xs font-black uppercase text-poke-yellow mb-1 tracking-widest">실제 스피드 수치</p>
                 <div className="text-6xl font-black italic">{finalSpeed}</div>
               </div>
-              {/* Background accent */}
               <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-8 -mt-8"></div>
             </div>
           </div>
         </div>
 
-        {/* Speed Tiers Hint (Simple) */}
+        {/* Speed Tiers Hint */}
         <div className="mt-8 p-4 bg-yellow-50 rounded-xl border-2 border-dashed border-poke-yellow">
           <p className="text-xs font-bold text-gray-600 leading-relaxed">
             💡 팁: 최속 130족(스피드 수치 200)을 추월하려면 이 수치가 201 이상이어야 합니다.
