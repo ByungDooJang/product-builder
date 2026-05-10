@@ -57,10 +57,20 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
 
+  // Unicode safe Base64
+  const toBase64 = (str: string) => btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode(parseInt(p1, 16))));
+  const fromBase64 = (str: string) => decodeURIComponent(Array.prototype.map.call(atob(str), (c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.startsWith('#team=')) {
-      try { setTeam(JSON.parse(atob(hash.split('#team=')[1]))); window.history.replaceState(null, '', window.location.pathname); } catch (e) {}
+      try { 
+        const encoded = hash.split('#team=')[1];
+        setTeam(JSON.parse(fromBase64(encoded))); 
+        window.history.replaceState(null, '', window.location.pathname); 
+      } catch (e) {
+        console.error("Link parse error", e);
+      }
     } else {
       const saved = localStorage.getItem('poke_team');
       if (saved) setTeam(JSON.parse(saved));
@@ -153,7 +163,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
   };
 
   const shareTeam = () => {
-    const encoded = btoa(JSON.stringify(team));
+    const encoded = toBase64(JSON.stringify(team));
     const url = `${window.location.origin}${window.location.pathname}#team=${encoded}`;
     if (navigator.share) navigator.share({ title: '나의 파티', url });
     else { navigator.clipboard.writeText(url); alert('링크 복사 완료!'); }
@@ -211,7 +221,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {team.map(m => (
                    <div key={m.id} className="relative bg-gray-50 p-4 rounded-2xl border-2 border-gray-100 flex flex-col items-center group animate-in zoom-in">
-                      <button onClick={() => removePokemon(m.id)} className="absolute -top-2 -right-2 bg-white text-gray-400 hover:text-poke-red rounded-full p-1 shadow-md border border-gray-100 transition-colors z-10"><X size={16} /></button>
+                      <button onClick={() => removePokemon(m.id)} className="absolute -top-2 -right-2 bg-white text-gray-400 rounded-full p-1 shadow-md border border-gray-100 transition-colors z-10"><X size={16} /></button>
                       <img src={m.sprite} className="w-20 h-20 object-contain mb-2" />
                       <span className="font-black text-[10px] text-center capitalize">{m.koName || m.name}</span>
                    </div>

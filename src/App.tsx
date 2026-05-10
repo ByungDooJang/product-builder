@@ -5,7 +5,7 @@ import DamageCalculator from './components/DamageCalculator';
 import TypeMatchup from './components/TypeMatchup';
 import TeamCoverage from './components/TeamCoverage';
 import SpeedTiers from './components/SpeedTiers';
-import { Info, TrendingUp, Users, ListOrdered } from 'lucide-react';
+import { Info, TrendingUp } from 'lucide-react';
 
 type View = 'home' | 'mbti' | 'speed' | 'damage' | 'matchup' | 'coverage' | 'tiers';
 
@@ -55,12 +55,60 @@ const App: React.FC = () => {
 
             {/* Main Tools Grid (3x2) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <MenuButton onClick={() => setView('mbti')} icon="🐾" title="성향 테스트" sub="나와 닮은 포켓몬은?" color="poke-yellow" label="MBTI Test" />
-              <MenuButton onClick={() => setView('speed')} icon="⚡" title="스피드 계산" sub="누가 먼저 공격할까?" color="poke-red" label="Speed Calc" />
-              <MenuButton onClick={() => setView('damage')} icon="⚔️" title="데미지 계산" sub="얼마나 아프게 때릴까?" color="poke-blue" label="Damage Calc" />
-              <MenuButton onClick={() => setView('matchup')} icon="🛡️" title="타입 상성" sub="이 포켓몬의 약점은?" color="green-500" label="Type Checker" />
-              <MenuButton onClick={() => setView('coverage')} icon="📊" title="파티 분석" sub="팀 전체의 약점 파악" color="purple-500" label="Team Coverage" />
-              <MenuButton onClick={() => setView('tiers')} icon="🏁" title="스피드 티어" sub="실전 포켓몬 속도 비교" color="orange-500" label="Speed Tiers" />
+              <MenuButton 
+                onClick={() => setView('mbti')} 
+                icon="🐾" 
+                title="성향 테스트" 
+                sub="나와 닮은 포켓몬은?" 
+                borderColor="border-poke-yellow" 
+                bgColor="bg-poke-yellow" 
+                label="MBTI Test" 
+              />
+              <MenuButton 
+                onClick={() => setView('speed')} 
+                icon="⚡" 
+                title="스피드 계산" 
+                sub="누가 먼저 공격할까?" 
+                borderColor="border-poke-red" 
+                bgColor="bg-poke-red" 
+                label="Speed Calc" 
+              />
+              <MenuButton 
+                onClick={() => setView('damage')} 
+                icon="⚔️" 
+                title="데미지 계산" 
+                sub="얼마나 아프게 때릴까?" 
+                borderColor="border-poke-blue" 
+                bgColor="bg-poke-blue" 
+                label="Damage Calc" 
+              />
+              <MenuButton 
+                onClick={() => setView('matchup')} 
+                icon="🛡️" 
+                title="타입 상성" 
+                sub="이 포켓몬의 약점은?" 
+                borderColor="border-green-500" 
+                bgColor="bg-green-500" 
+                label="Type Checker" 
+              />
+              <MenuButton 
+                onClick={() => setView('coverage')} 
+                icon="📊" 
+                title="파티 분석" 
+                sub="팀 전체의 약점 파악" 
+                borderColor="border-purple-500" 
+                bgColor="bg-purple-500" 
+                label="Team Coverage" 
+              />
+              <MenuButton 
+                onClick={() => setView('tiers')} 
+                icon="🏁" 
+                title="스피드 티어" 
+                sub="실전 포켓몬 속도 비교" 
+                borderColor="border-orange-500" 
+                bgColor="bg-orange-500" 
+                label="Speed Tiers" 
+              />
             </div>
           </div>
         );
@@ -100,16 +148,26 @@ const App: React.FC = () => {
   );
 };
 
-const MenuButton = ({ onClick, icon, title, sub, color, label }: any) => (
+interface MenuButtonProps {
+  onClick: () => void;
+  icon: string;
+  title: string;
+  sub: string;
+  borderColor: string;
+  bgColor: string;
+  label: string;
+}
+
+const MenuButton = ({ onClick, icon, title, sub, borderColor, bgColor, label }: MenuButtonProps) => (
   <button 
     onClick={onClick}
-    className={`group relative bg-white rounded-3xl p-6 border-8 border-${color} shadow-[0_8px_0_0_rgba(0,0,0,0.1)] hover:translate-y-1 hover:shadow-none transition-all duration-200 cursor-pointer`}
+    className={`group relative bg-white rounded-3xl p-6 border-8 ${borderColor} shadow-[0_8px_0_0_rgba(0,0,0,0.1)] hover:translate-y-1 hover:shadow-none transition-all duration-200 cursor-pointer`}
   >
     <div className="flex flex-col items-center gap-3 text-poke-dark">
       <div className="text-5xl group-hover:scale-110 transition-transform">{icon}</div>
       <h2 className="text-xl font-black uppercase tracking-tighter">{title}</h2>
       <p className="font-bold text-gray-500 text-xs text-center leading-tight">{sub}</p>
-      <div className={`mt-2 px-4 py-1.5 bg-${color} text-white font-black rounded-full text-[10px] uppercase italic`}>{label}</div>
+      <div className={`mt-2 px-4 py-1.5 ${bgColor} text-white font-black rounded-full text-[10px] uppercase italic`}>{label}</div>
     </div>
   </button>
 );
