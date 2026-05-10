@@ -54,10 +54,23 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
 
-  // Load from localStorage on mount
+  // Load from URL or localStorage on mount
   useEffect(() => {
-    const savedTeam = localStorage.getItem('poke_team');
-    if (savedTeam) setTeam(JSON.parse(savedTeam));
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#team=')) {
+      try {
+        const encoded = hash.split('#team=')[1];
+        const decoded = JSON.parse(atob(encoded));
+        setTeam(decoded);
+        // Clean hash
+        window.history.replaceState(null, '', window.location.pathname);
+      } catch (e) {
+        console.error("Failed to parse shared team", e);
+      }
+    } else {
+      const savedTeam = localStorage.getItem('poke_team');
+      if (savedTeam) setTeam(JSON.parse(savedTeam));
+    }
   }, []);
 
   // Save to localStorage when team changes
@@ -106,12 +119,15 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
   const shareTeam = () => {
     if (team.length === 0) return;
     const names = team.map(m => m.koName || m.name).join(', ');
+    const encodedData = btoa(JSON.stringify(team));
+    const shareUrl = `${window.location.origin}${window.location.pathname}#team=${encodedData}`;
     const text = `나의 포켓몬 파티 분석 결과: [${names}] 파티의 상성을 확인해보세요!`;
+    
     if (navigator.share) {
-      navigator.share({ title: '나의 포켓몬 파티', text, url: window.location.href });
+      navigator.share({ title: '나의 포켓몬 파티', text, url: shareUrl });
     } else {
-      navigator.clipboard.writeText(`${text} ${window.location.href}`);
-      alert('파티 정보가 클립보드에 복사되었습니다!');
+      navigator.clipboard.writeText(`${text} ${shareUrl}`);
+      alert('공유 링크가 클립보드에 복사되었습니다!');
     }
   };
 
@@ -158,7 +174,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
           <div className="bg-poke-red p-3 rounded-2xl text-white shadow-lg"><Users size={32} /></div>
           <div>
             <h2 className="text-3xl font-black uppercase tracking-tighter">파티 상성 분석기</h2>
-            <p className="text-gray-500 font-bold italic">Persistence & Sharing Active!</p>
+            <p className="text-gray-500 font-bold italic">Dynamic Link Sharing Enabled!</p>
           </div>
         </div>
 
@@ -232,7 +248,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
 
         <div className="p-4 bg-yellow-50 rounded-2xl border-2 border-dashed border-poke-yellow/30">
            <p className="text-xs font-bold text-gray-600 leading-relaxed">
-             💡 팁: 파티 전체가 한 가지 타입(예: 페어리)에 너무 취약하지 않은지 확인하세요. 취약한 타입에 강한 포켓몬을 한두 마리 섞어주는 것이 좋습니다.
+             💡 팁: 공유하기를 사용하면 현재 구성한 파티 링크를 생성합니다. 상대방도 내가 만든 파티 구성을 즉시 볼 수 있습니다.
            </p>
         </div>
       </div>
