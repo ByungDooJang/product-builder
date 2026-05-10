@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { ChevronLeft, Sparkles, Trophy, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, Sparkles, Trophy, RotateCcw, Loader2 } from 'lucide-react';
+import axios from 'axios';
 
 interface Question {
   id: number;
@@ -84,10 +85,19 @@ const results: Record<string, { name: string; desc: string; icon: string }> = {
   'INFP': { name: '님피아', desc: '자신의 신념과 가치를 소중히 여기는 이상주의자입니다.', icon: '🎀' },
 };
 
+const mbtiToPokemonName: Record<string, string> = {
+  'ESTJ': 'arcanine', 'ENTJ': 'empoleon', 'ESFJ': 'blissey', 'ENFJ': 'togekiss',
+  'ESTP': 'machamp', 'ENTP': 'gengar', 'ESFP': 'pikachu', 'ENFP': 'jigglypuff',
+  'ISTJ': 'metagross', 'INTJ': 'mewtwo', 'ISFJ': 'meganium', 'INFJ': 'gardevoir',
+  'ISTP': 'lucario', 'INTP': 'alakazam', 'ISFP': 'eevee', 'INFP': 'sylveon'
+};
+
 const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
   const [result, setResult] = useState<string | null>(null);
+  const [resultSprite, setResultSprite] = useState<string | null>(null);
+  const [isLoadingResult, setIsLoadingResult] = useState(false);
 
   const handleAnswer = (type: string) => {
     const newAnswers = [...answers, type];
@@ -95,11 +105,12 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
       setAnswers(newAnswers);
       setCurrentStep(currentStep + 1);
     } else {
-      calculateResult(newAnswers);
+      calculateFinalResult(newAnswers);
     }
   };
 
-  const calculateResult = (finalAnswers: string[]) => {
+  const calculateFinalResult = async (finalAnswers: string[]) => {
+    setIsLoadingResult(true);
     const counts: Record<string, number> = {};
     finalAnswers.forEach(a => counts[a] = (counts[a] || 0) + 1);
 
@@ -111,13 +122,34 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
     ].join('');
 
     setResult(mbti);
+
+    try {
+      const apiName = mbtiToPokemonName[mbti] || 'pikachu';
+      const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${apiName}`);
+      setResultSprite(response.data.sprites.other['official-artwork'].front_default);
+    } catch (e) {
+      console.error("Sprite fetch failed", e);
+    } finally {
+      setIsLoadingResult(false);
+    }
   };
 
   const resetTest = () => {
     setCurrentStep(0);
     setAnswers([]);
     setResult(null);
+    setResultSprite(null);
   };
+
+  if (isLoadingResult) {
+    return (
+      <div className="w-full max-w-2xl flex flex-col items-center justify-center min-h-[400px] bg-white rounded-3xl border-8 border-poke-yellow shadow-xl text-poke-dark">
+        <Loader2 size={64} className="animate-spin text-poke-yellow mb-4" />
+        <h2 className="text-2xl font-black uppercase italic tracking-tighter">분석 중...</h2>
+        <p className="font-bold text-gray-400 mt-2">당신에게 맞는 포켓몬을 찾고 있습니다.</p>
+      </div>
+    );
+  }
 
   if (result) {
     const pokemon = results[result] || results['ENFP'];
@@ -127,12 +159,22 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
           <div className="inline-block bg-poke-yellow p-4 rounded-full mb-6 shadow-lg animate-bounce">
             <Trophy size={48} className="text-poke-dark" />
           </div>
-          <h2 className="text-xl font-bold text-gray-500 uppercase tracking-widest mb-2">당신은 어떤 트레이너?</h2>
-          <div className="text-6xl mb-4">{pokemon.icon}</div>
+          <h2 className="text-xl font-bold text-gray-500 uppercase tracking-widest mb-2">당신의 파트너 포켓몬은?</h2>
+          
+          <div className="flex justify-center mb-6 relative">
+            <div className="absolute inset-0 bg-poke-yellow/10 rounded-full blur-3xl animate-pulse"></div>
+            {resultSprite ? (
+              <img src={resultSprite} alt={pokemon.name} className="w-64 h-64 object-contain relative z-10 drop-shadow-2xl" />
+            ) : (
+              <div className="text-9xl relative z-10">{pokemon.icon}</div>
+            )}
+          </div>
+
           <h3 className="text-4xl font-black mb-4 text-poke-dark">
             <span className="text-poke-blue">{result}</span>형 트레이너, <br/>
             <span className="text-poke-red">[{pokemon.name}]</span> 입니다!
           </h3>
+          
           <p className="text-lg font-bold text-gray-600 mb-8 leading-relaxed">
             {pokemon.desc}
           </p>
@@ -150,7 +192,7 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
                   alert('공유하기를 지원하지 않는 브라우저입니다. 링크를 복사해주세요!');
                 }
               }}
-              className="flex items-center justify-center gap-2 w-full py-4 bg-poke-blue text-white font-black rounded-2xl uppercase italic hover:scale-105 transition-transform"
+              className="flex items-center justify-center gap-2 w-full py-4 bg-poke-blue text-white font-black rounded-2xl uppercase italic hover:scale-105 transition-transform shadow-lg"
             >
               <Sparkles size={20} /> 결과 공유하기
             </button>
@@ -196,7 +238,6 @@ const TrainerTest: React.FC<TrainerTestProps> = ({ onBack }) => {
           </span>
         </div>
 
-        {/* Progress Bar */}
         <div className="w-full h-4 bg-gray-100 rounded-full mb-10 overflow-hidden border-2 border-gray-200">
           <div 
             className="h-full bg-poke-yellow transition-all duration-300"

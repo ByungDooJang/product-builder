@@ -56,12 +56,14 @@ const matchupData: Record<string, { double: string[], half: string[], zero: stri
 
 const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [sprite, setSprite] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [suggestions, setSuggestions] = useState<PokemonData[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const toggleType = (typeName: string) => {
+    setSprite(null);
     if (selectedTypes.includes(typeName)) {
       setSelectedTypes(selectedTypes.filter(t => t !== typeName));
     } else if (selectedTypes.length < 2) {
@@ -105,7 +107,9 @@ const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
     try {
       const response = await axios.get(`https://pokeapi.co/api/v2/pokemon/${p.name}`);
       const typesData = response.data.types.map((t: any) => t.type.name.charAt(0).toUpperCase() + t.type.name.slice(1));
+      const spriteUrl = response.data.sprites.other['official-artwork'].front_default || response.data.sprites.front_default;
       setSelectedTypes(typesData);
+      setSprite(spriteUrl);
     } catch (error) { alert('실패'); }
     finally { setIsSearching(false); }
   };
@@ -151,7 +155,7 @@ const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
             </div>
           </div>
           {selectedTypes.length > 0 && (
-            <button onClick={() => {setSelectedTypes([]); setSearchTerm('');}} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
+            <button onClick={() => {setSelectedTypes([]); setSearchTerm(''); setSprite(null);}} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
               <X size={20} className="text-gray-500" />
             </button>
           )}
@@ -203,16 +207,16 @@ const TypeMatchup: React.FC<TypeMatchupProps> = ({ onBack }) => {
                 );
               })}
             </div>
-            {selectedTypes.length === 0 && (
-              <p className="mt-6 text-center text-gray-400 font-bold italic animate-pulse">
-                타입을 선택하여 분석을 시작하세요.
-              </p>
-            )}
           </div>
 
           <div className="space-y-6">
             {selectedTypes.length > 0 && (
               <>
+                {sprite && (
+                  <div className="flex justify-center mb-6 bg-gray-50 rounded-2xl p-4 border-2 border-gray-100 animate-in zoom-in duration-300">
+                    <img src={sprite} alt="Pokemon" className="w-40 h-40 object-contain drop-shadow-lg" />
+                  </div>
+                )}
                 <div>
                   <h3 className="flex items-center gap-2 text-sm font-black uppercase mb-3 text-poke-red">
                     <Swords size={16} /> 약점 (데미지 많이 받음)
