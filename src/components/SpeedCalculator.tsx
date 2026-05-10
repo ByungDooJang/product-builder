@@ -20,6 +20,7 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
   const [ev, setEv] = useState<number>(0);
   const [nature, setNature] = useState<number>(1.0);
   const [modifier, setModifier] = useState<number>(1.0);
+  const [rank, setRank] = useState<number>(0);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -27,8 +28,14 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const calculateSpeed = () => {
-    const stats = Math.floor((baseSpeed * 2 + iv + Math.floor(ev / 4)) * level / 100 + 5);
-    return Math.floor(stats * nature * modifier);
+    let stats = Math.floor((baseSpeed * 2 + iv + Math.floor(ev / 4)) * level / 100 + 5);
+    stats = Math.floor(stats * nature);
+    
+    // Apply Stat Rank (n/2 multiplier)
+    const multiplier = rank >= 0 ? (2 + rank) / 2 : 2 / (2 - rank);
+    stats = Math.floor(stats * multiplier);
+    
+    return Math.floor(stats * modifier);
   };
 
   const finalSpeed = calculateSpeed();
@@ -74,7 +81,7 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
           <div className="bg-poke-red p-3 rounded-2xl text-white shadow-lg"><Zap size={32} fill="white" /></div>
           <div>
             <h2 className="text-3xl font-black uppercase tracking-tighter">실시간 스피드 계산기</h2>
-            <p className="text-gray-500 font-bold">누가 먼저 선공을 가져갈까요?</p>
+            <p className="text-gray-500 font-bold italic">Stat Ranks Support Active!</p>
           </div>
         </div>
 
@@ -127,7 +134,7 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
           <div className="flex flex-col justify-between space-y-4">
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-black uppercase mb-1 italic">성격 보정 (Nature)</label>
+                <label className="block text-xs font-black uppercase mb-1 italic">성격 보정</label>
                 <select value={nature} onChange={(e) => setNature(Number(e.target.value))} className="w-full bg-gray-100 p-3 rounded-xl font-bold appearance-none">
                   <option value={1.1}>상승 (x1.1)</option>
                   <option value={1.0}>보통 (x1.0)</option>
@@ -135,7 +142,25 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-black uppercase mb-1 italic">도구/특성 (Modifier)</label>
+                <label className="block text-xs font-black uppercase mb-1 italic">랭크 변화 (Rank)</label>
+                <select value={rank} onChange={(e) => setRank(Number(e.target.value))} className="w-full bg-gray-100 p-3 rounded-xl font-bold appearance-none border-2 border-poke-red/20 focus:border-poke-red transition-all">
+                  <option value={6}>+6 (x4.0)</option>
+                  <option value={5}>+5 (x3.5)</option>
+                  <option value={4}>+4 (x3.0)</option>
+                  <option value={3}>+3 (x2.5)</option>
+                  <option value={2}>+2 (x2.0)</option>
+                  <option value={1}>+1 (x1.5)</option>
+                  <option value={0}>0 (보통)</option>
+                  <option value={-1}>-1 (x0.66)</option>
+                  <option value={-2}>-2 (x0.5)</option>
+                  <option value={-3}>-3 (x0.4)</option>
+                  <option value={-4}>-4 (x0.33)</option>
+                  <option value={-5}>-5 (x0.28)</option>
+                  <option value={-6}>-6 (x0.25)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase mb-1 italic">도구/특성</label>
                 <select value={modifier} onChange={(e) => setModifier(Number(e.target.value))} className="w-full bg-gray-100 p-3 rounded-xl font-bold appearance-none">
                   <option value={1.0}>없음 (x1.0)</option>
                   <option value={1.5}>구애스카프 (x1.5)</option>
@@ -153,7 +178,9 @@ const SpeedCalculator: React.FC<SpeedCalculatorProps> = ({ onBack }) => {
         </div>
 
         <div className="mt-8 p-4 bg-yellow-50 rounded-xl border-2 border-dashed border-poke-yellow/30">
-          <p className="text-xs font-bold text-gray-600">💡 팁: 최속 130족(스피드 수치 200)을 추월하려면 201 이상이어야 합니다.</p>
+          <p className="text-xs font-bold text-gray-600 italic leading-relaxed">
+            💡 팁: '용의춤', '나비춤' 등 랭크업 기술을 사용했다면 랭크 변화(+1 등)를 반영하세요.
+          </p>
         </div>
       </div>
     </div>
