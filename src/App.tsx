@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List, Grid3X3, Grid, Clock } from 'lucide-react';
+import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List, Grid3X3, Grid, Clock, Wind, Thermometer, ShoppingBag } from 'lucide-react';
 import { usageStats } from './data/usageStats';
 import { pokemonNameMap } from './data/pokemonNames';
 
@@ -30,11 +30,10 @@ const themes: Record<string, any> = {
 };
 
 const tips = [
-  "더블 배틀에서는 '도움말' 기술로 아군의 데미지를 1.5배 올릴 수 있습니다.",
-  "랭크 변화(+1)는 해당 능력치를 1.5배로 만듭니다.",
-  "테라스탈을 활용해 약점을 지우고 기습적인 카운터를 날려보세요.",
-  "스피드 수치가 같은 경우 50%의 확률로 선공이 결정됩니다.",
-  "필드 효과는 5턴간 유지되며, 다른 필드가 깔리면 덮어씌워집니다.",
+  "배틀 매트릭스에서 취약한 대상을 클릭하면 즉시 데미지 계산기로 넘어갑니다.",
+  "팀 빌딩 도우미는 현재 팀의 약점을 보완할 수 있는 최고의 카운터 파트너를 추천합니다.",
+  "랭크 변화(+2)는 화력을 2배로 올리는 강력한 스윕 기회입니다.",
+  "테라스탈은 방어뿐만 아니라 공격 STAB 배율(2.0x)을 극대화하는 용도로도 쓰입니다.",
 ];
 
 const App: React.FC = () => {
@@ -45,6 +44,9 @@ const App: React.FC = () => {
   const [quickSearchTerm, setQuickSearchTerm] = useState('');
   const [qsResults, setQsResults] = useState<any[]>([]);
   const [searchHistory, setSearchHistory] = useState<any[]>([]);
+
+  // Deep Integration State
+  const [prefillData, setPreFillData] = useState<any>(null);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('poke_theme_id');
@@ -74,15 +76,16 @@ const App: React.FC = () => {
     const newHistory = [p, ...searchHistory.filter(h => h.name !== p.name)].slice(0, 5);
     setSearchHistory(newHistory);
     localStorage.setItem('global_search_history', JSON.stringify(newHistory));
-    handleNav('counter'); // For now, go to counter checker
+    handleNav('counter');
   };
 
   const triggerHaptic = () => {
     if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(10);
   };
 
-  const handleNav = (newView: View) => {
+  const handleNav = (newView: View, data: any = null) => {
     triggerHaptic();
+    setPreFillData(data);
     setView(newView);
     setShowQuickSearch(false);
   };
@@ -94,17 +97,17 @@ const App: React.FC = () => {
           switch (view) {
             case 'speed': return <SpeedCalculator onBack={() => setView('home')} />;
             case 'mbti': return <TrainerTest onBack={() => setView('home')} />;
-            case 'damage': return <DamageCalculator onBack={() => setView('home')} />;
+            case 'damage': return <DamageCalculator onBack={() => setView('home')} prefill={prefillData} />;
             case 'matchup': return <TypeMatchup onBack={() => setView('home')} />;
-            case 'coverage': return <TeamCoverage onBack={() => setView('home')} />;
+            case 'coverage': return <TeamCoverage onBack={() => setView('home')} onSuggest={(type: string) => handleNav('partnership', { targetType: type })} />;
             case 'tiers': return <SpeedTiers onBack={() => setView('home')} />;
             case 'priority': return <PriorityGuide onBack={() => setView('home')} />;
             case 'counter': return <CounterChecker onBack={() => setView('home')} />;
             case 'settings': return <SettingsTool onBack={() => setView('home')} onThemeChange={handleThemeChange} currentTheme={themeId} />;
             case 'log': return <BattleLog onBack={() => setView('home')} />;
-            case 'partnership': return <PartnershipSuggester onBack={() => setView('home')} />;
+            case 'partnership': return <PartnershipSuggester onBack={() => setView('home')} prefill={prefillData} />;
             case 'heatmap': return <CoverageHeatmap onBack={() => setView('home')} />;
-            case 'matrix': return <BattleMatrix onBack={() => setView('home')} />;
+            case 'matrix': return <BattleMatrix onBack={() => setView('home')} onDetail={(atk: string, def: string) => handleNav('damage', { attacker: atk, defender: def })} />;
             case 'status': return <StatusMaster onBack={() => setView('home')} />;
             case 'items': return <ItemGuide onBack={() => setView('home')} />;
             case 'control': return <SpeedControlMaster onBack={() => setView('home')} />;
@@ -113,35 +116,46 @@ const App: React.FC = () => {
                 <div className="w-full max-w-7xl animate-in fade-in duration-500 pb-20">
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-12">
                     <div className="lg:col-span-8 space-y-6">
-                       <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-6 flex items-start gap-4 shadow-xl">
-                          <div className="bg-poke-yellow p-3 rounded-2xl text-poke-dark shadow-lg shrink-0"><Info size={24} /></div>
-                          <div><h3 className="text-sm font-black uppercase text-poke-yellow mb-1 italic">Master's Mastery Tip</h3><p className="text-lg font-bold text-gray-200 leading-snug">"{tips[tipIndex]}"</p></div>
+                       <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-6 flex items-start gap-4 shadow-xl relative overflow-hidden">
+                          <div className="bg-poke-yellow p-3 rounded-2xl text-poke-dark shadow-lg shrink-0 z-10"><Info size={24} /></div>
+                          <div className="z-10">
+                            <h3 className="text-sm font-black uppercase text-poke-yellow mb-1 italic">Grand Master Insights</h3>
+                            <p className="text-lg font-bold text-gray-200 leading-snug">"{tips[tipIndex]}"</p>
+                          </div>
+                          <div className="absolute top-0 right-0 p-4 opacity-5 rotate-12"><Trophy size={100} /></div>
                        </div>
                        <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-6 shadow-xl">
-                          <h3 className="text-xs font-black uppercase text-poke-red mb-4 italic tracking-widest"><TrendingUp size={16}/> Usage Stats</h3>
+                          <div className="flex items-center justify-between mb-4">
+                             <h3 className="text-xs font-black uppercase text-poke-red tracking-widest flex items-center gap-2 italic"><TrendingUp size={16}/> World Meta Series 19</h3>
+                             <span className="text-[8px] font-black text-white/30 uppercase italic">Updated Live</span>
+                          </div>
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                             {usageStats.slice(0, 5).map(p => (<div key={p.rank} className="bg-poke-dark/50 p-2 rounded-xl border border-white/5 flex flex-col items-center"><span className="text-[8px] font-black text-poke-yellow uppercase">Rank {p.rank}</span><span className="text-[10px] font-bold text-white truncate w-full text-center">{p.koName}</span></div>))}
+                             {usageStats.slice(0, 5).map(p => (<div key={p.rank} className="bg-poke-dark/50 p-2 rounded-xl border border-white/5 flex flex-col items-center hover:scale-105 transition-transform cursor-pointer"><span className="text-[8px] font-black text-poke-yellow uppercase">Rank {p.rank}</span><span className="text-[10px] font-bold text-white truncate w-full text-center">{p.koName}</span></div>))}
                           </div>
                        </div>
                     </div>
                     <div className="lg:col-span-4 bg-gradient-to-br from-poke-red/20 to-poke-red/5 border-2 border-poke-red/20 rounded-3xl p-6 flex flex-col justify-center items-center text-center shadow-xl relative overflow-hidden group cursor-pointer" onClick={() => handleNav('log')}>
-                      <Trophy className="text-poke-red mb-2 group-hover:scale-110 transition-transform" size={48} /><h3 className="text-xs font-black uppercase text-poke-red tracking-widest">나의 승전보</h3><p className="font-black text-3xl text-white italic leading-none mt-1 uppercase">Champion Logs</p>
+                      <Trophy className="text-poke-red mb-2 group-hover:scale-110 transition-transform" size={48} /><h3 className="text-xs font-black uppercase text-poke-red tracking-widest">그랜드 마스터 로그</h3><p className="font-black text-3xl text-white italic leading-none mt-1 uppercase">Hall of Fame</p>
                     </div>
                   </div>
 
+                  {/* Ultimate 4x4 Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4 md:gap-6">
                     <MenuButton onClick={() => handleNav('mbti')} icon="🐾" title="성향 테스트" color="border-poke-yellow" label="MBTI" />
                     <MenuButton onClick={() => handleNav('speed')} icon="⚡" title="스피드 계산" color="border-poke-red" label="SPEED" />
                     <MenuButton onClick={() => handleNav('damage')} icon="⚔️" title="데미지 시뮬" color="border-poke-blue" label="DAMAGE" />
                     <MenuButton onClick={() => handleNav('matrix')} icon="🥊" title="배틀 매트릭스" color="border-red-500" label="MATRIX" />
+                    
                     <MenuButton onClick={() => handleNav('matchup')} icon="🛡️" title="타입 상성" color="border-green-500" label="TYPES" />
                     <MenuButton onClick={() => handleNav('coverage')} icon="📊" title="파티 분석" color="border-purple-500" label="TEAM" />
                     <MenuButton onClick={() => handleNav('tiers')} icon="🏁" title="스피드 티어" color="border-orange-500" label="TIERS" />
                     <MenuButton onClick={() => handleNav('heatmap')} icon="🗺️" title="견제 분석" color="border-orange-400" label="HEATMAP" />
+                    
                     <MenuButton onClick={() => handleNav('partnership')} icon="🤝" title="팀 빌딩" color="border-indigo-500" label="PARTNER" />
                     <MenuButton onClick={() => handleNav('control')} icon={<Wind size={48}/>} title="스피드 조절" color="border-cyan-400" label="CONTROL" />
                     <MenuButton onClick={() => handleNav('priority')} icon="🚀" title="우선도 가이드" color="border-cyan-500" label="PRIORITY" />
                     <MenuButton onClick={() => handleNav('counter')} icon="🎯" title="카운터 분석" color="border-pink-500" label="COUNTER" />
+                    
                     <MenuButton onClick={() => handleNav('status')} icon={<Thermometer size={48}/>} title="상태 이상" color="border-red-400" label="STATUS" />
                     <MenuButton onClick={() => handleNav('items')} icon={<ShoppingBag size={48}/>} title="도구 백과" color="border-indigo-400" label="ITEMS" />
                     <MenuButton onClick={() => handleNav('log')} icon="📝" title="배틀 로그" color="border-blue-400" label="LOGS" />
@@ -182,7 +196,6 @@ const App: React.FC = () => {
                   <button onClick={() => setShowQuickSearch(false)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
                </div>
                
-               {/* Search History */}
                {quickSearchTerm.length === 0 && searchHistory.length > 0 && (
                   <div className="mt-4">
                      <p className="text-[10px] font-black text-white/50 uppercase tracking-widest mb-2 flex items-center gap-2 px-2"><Clock size={12}/> 최근 검색 기록</p>
@@ -211,7 +224,7 @@ const App: React.FC = () => {
       </nav>
 
       <footer className="bg-poke-dark p-6 text-center border-t-2 border-white/10 pb-24 md:pb-6">
-        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest italic tracking-[0.2em]">Pokémon Champions v13.0 Cinematic Mastery</p>
+        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest italic tracking-[0.2em]">Pokémon Champions v16.0 Grand Master Edition</p>
       </footer>
     </div>
   );
