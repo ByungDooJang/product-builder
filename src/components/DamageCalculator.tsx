@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Swords, ChevronLeft, Shield, Target, Search, Loader2, History, CloudSun, Zap as TerrainIcon, HelpCircle, X, ShoppingBag, Wand2, Star } from 'lucide-react';
 import axios from 'axios';
 import { pokemonNameMap, moveNameMap } from '../data/pokemonNames';
@@ -13,6 +13,7 @@ interface PokemonData {
   koName?: string;
   sprite?: string;
   baseStats?: any;
+  moves?: string[];
 }
 
 const types = ['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Steel', 'Fairy', 'Dark'];
@@ -43,9 +44,7 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   const [moveType, setMoveType] = useState<string>('Normal');
   const [moveCategory, setMoveCategory] = useState<'physical' | 'special'>('physical');
   const [power, setPower] = useState<number>(80);
-  const [isStab, setIsStab] = useState<boolean>(true);
-  const [isCritical, setIsCritical] = useState<boolean>(false);
-
+  
   // Tera System
   const [attackerTera, setAttackerTera] = useState<string>('None');
   const [defenderTera, setDefenderTera] = useState<string>('None');
@@ -59,6 +58,7 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   const [atkNature, setAtkNature] = useState<number>(1.1);
   const [atkRank, setAtkRank] = useState<number>(0);
   const [atkFullStats, setAtkFullStats] = useState<any>(null);
+  const [attackerMoves, setAttackerMoves] = useState<string[]>([]);
 
   // Defender Stats
   const [defBase, setDefBase] = useState<number>(100);
@@ -76,6 +76,7 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
   const [ability, setAbility] = useState<string>('none');
   const [weather, setWeather] = useState<'none' | 'sun' | 'rain' | 'sand' | 'snow'>('none');
   const [terrain, setTerrain] = useState<'none' | 'electric' | 'grassy' | 'psychic' | 'misty'>('none');
+  const [isCritical, setIsCritical] = useState<boolean>(false);
 
   const [attackerSprite, setAttackerSprite] = useState<string | null>(null);
   const [defenderSprite, setDefenderSprite] = useState<string | null>(null);
@@ -151,11 +152,21 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
     if (term.length < 1) { setSuggestions([]); return; }
     if (activeSearch === 'move') {
        const koMoveMatches = Object.entries(moveNameMap).filter(([ko]) => ko.includes(term)).map(([ko, en]) => ({ name: en, koName: ko }));
-       try {
-          const res = await axios.get('https://pokeapi.co/api/v2/move?limit=1000');
-          const enMatches = res.data.results.filter((m: any) => m.name.toLowerCase().includes(term.toLowerCase())).map((m: any) => ({ name: m.name }));
-          setSuggestions([...koMoveMatches, ...enMatches].slice(0, 5));
-       } catch (e) {}
+       
+       let combined: any[] = [...koMoveMatches];
+       // If we have attacker moves, prioritize/filter them
+       if (attackerMoves.length > 0) {
+          const learnable = attackerMoves.filter(m => m.includes(term.toLowerCase().replace(/ /g, '-')));
+          const learnableMatches = learnable.map(m => ({ name: m }));
+          combined = [...combined, ...learnableMatches];
+       } else {
+          try {
+             const res = await axios.get('https://pokeapi.co/api/v2/move?limit=1000');
+             const enMatches = res.data.results.filter((m: any) => m.name.toLowerCase().includes(term.toLowerCase())).map((m: any) => ({ name: m.name }));
+             combined = [...combined, ...enMatches];
+          } catch (e) {}
+       }
+       setSuggestions(Array.from(new Map(combined.map(item => [item.name, item])).values()).slice(0, 5));
        return;
     }
     const koMatches = Object.entries(pokemonNameMap).filter(([ko]) => ko.includes(term)).map(([ko, en]) => ({ name: en, koName: ko }));
@@ -214,6 +225,7 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
         setAttackerBaseTypes(typeList);
         setAttackerSprite(spriteUrl);
         setAtkFullStats(s);
+        setAttackerMoves(response.data.moves.map((m: any) => m.move.name));
       } else {
         setDefBase(moveCategory === 'physical' ? s.def : s.spDef);
         setHpBase(s.hp);
@@ -240,10 +252,10 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
         <div className="flex items-center justify-between mb-8 border-b-4 border-gray-100 pb-4">
           <div className="flex items-center gap-4">
             <div className="bg-poke-blue p-3 rounded-2xl text-white shadow-lg animate-pulse"><Swords size={32} /></div>
-            <div><h2 className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none">데미지 시뮬레이터</h2><p className="text-[10px] md:text-xs text-gray-500 font-bold italic">Full Analytics 4.0</p></div>
+            <div><h2 className="text-xl md:text-3xl font-black uppercase tracking-tighter leading-none">데미지 시뮬레이터</h2><p className="text-[10px] md:text-xs text-gray-500 font-bold italic">Smart Move Search Active!</p></div>
           </div>
           <div className="flex gap-2">
-             <button onClick={() => applyPreset('AS')} className="p-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded-full transition-all"><Wand2 size={24} /></button>
+             <button onClick={() => applyPreset('AS')} className="p-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-200 rounded-full transition-all" title="공격 프리셋"><Wand2 size={24} /></button>
              <button onClick={() => setShowNatureRef(true)} className="p-2 bg-gray-100 text-gray-400 hover:text-poke-blue rounded-full transition-all"><HelpCircle size={24} /></button>
           </div>
         </div>
@@ -269,30 +281,30 @@ const DamageCalculator: React.FC<DamageCalculatorProps> = ({ onBack }) => {
            <div className="lg:col-span-8 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                  <div className="relative"><input type="text" placeholder="기술 검색..." value={moveSearch} onFocus={() => setActiveSearch('move')} onChange={(e) => setMoveSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 rounded-xl font-bold text-xs" />
-                   {activeSearch === 'move' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectMove(p)} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span></button>))}</div>)}
+                   {activeSearch === 'move' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectMove(p)} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span>{attackerMoves.includes(p.name) && <Star size={10} className="text-yellow-500 fill-yellow-500" />}</button>))}</div>)}
                  </div>
                  <div className="relative"><input type="text" placeholder="공격자..." value={attackerSearch} onFocus={() => setActiveSearch('attacker')} onChange={(e) => setAttackerSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 rounded-xl font-bold text-xs" />
-                   {activeSearch === 'attacker' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'attacker')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px]"><span>{p.koName || p.name}</span></button>))}</div>)}
+                   {activeSearch === 'attacker' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'attacker')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span></button>))}</div>)}
                  </div>
                  <div className="relative"><input type="text" placeholder="방어자..." value={defenderSearch} onFocus={() => setActiveSearch('defender')} onChange={(e) => setDefenderSearch(e.target.value)} className="w-full bg-gray-50 border-2 border-gray-100 p-2 rounded-xl font-bold text-xs" />
-                   {activeSearch === 'defender' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'defender')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px]"><span>{p.koName || p.name}</span></button>))}</div>)}
+                   {activeSearch === 'defender' && suggestions.length > 0 && (<div className="absolute z-20 w-full mt-1 bg-white border-2 border-poke-blue rounded-xl shadow-lg overflow-hidden">{suggestions.map(p => (<button key={p.name} onClick={() => selectPokemon(p, 'defender')} className="w-full p-2 text-left hover:bg-gray-50 font-bold capitalize text-[10px] flex justify-between"><span>{p.koName || p.name}</span></button>))}</div>)}
                  </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-5 rounded-2xl border border-gray-100 shadow-inner">
                  <div className="space-y-2">
-                    <h4 className="text-[10px] font-black uppercase text-poke-blue italic">Attacker Fine-tuning</h4>
+                    <h4 className="text-[10px] font-black uppercase text-poke-blue italic">Attacker Stats</h4>
                     <div className="grid grid-cols-3 gap-1">
-                       <div><label className="text-[8px] font-black text-gray-400">B</label><input type="number" value={atkBase} onChange={e => setAtkBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
+                       <div><label className="text-[8px] font-black text-gray-400">Base</label><input type="number" value={atkBase} onChange={e => setAtkBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                        <div><label className="text-[8px] font-black text-gray-400">IV</label><input type="number" value={atkIv} onChange={e => setAtkIv(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                        <div><label className="text-[8px] font-black text-gray-400">EV</label><input type="number" value={atkEv} onChange={e => setAtkEv(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                     </div>
                  </div>
                  <div className="space-y-2">
-                    <h4 className="text-[10px] font-black uppercase text-poke-red italic">Defender Fine-tuning</h4>
+                    <h4 className="text-[10px] font-black uppercase text-poke-red italic">Defender Stats</h4>
                     <div className="grid grid-cols-3 gap-1">
-                       <div><label className="text-[8px] font-black text-gray-400">D-B</label><input type="number" value={defBase} onChange={e => setDefBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
-                       <div><label className="text-[8px] font-black text-gray-400">H-B</label><input type="number" value={hpBase} onChange={e => setHpBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
+                       <div><label className="text-[8px] font-black text-gray-400">Def B</label><input type="number" value={defBase} onChange={e => setDefBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
+                       <div><label className="text-[8px] font-black text-gray-400">HP B</label><input type="number" value={hpBase} onChange={e => setHpBase(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                        <div><label className="text-[8px] font-black text-gray-400">EV</label><input type="number" value={defEv} onChange={e => setDefEv(Number(e.target.value))} className="w-full p-1 rounded font-bold text-[10px]" /></div>
                     </div>
                  </div>
