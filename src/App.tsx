@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List, Grid3X3, Grid, Clock, Wind, Thermometer, ShoppingBag, FlaskConical } from 'lucide-react';
+import { Info, TrendingUp, Home, Search, Star, User, Loader2, Trophy, Settings, X, Zap, Heart, List, Grid3X3, Grid, Clock, Wind, Thermometer, ShoppingBag, FlaskConical, Library } from 'lucide-react';
 import { usageStats } from './data/usageStats';
 import { pokemonNameMap } from './data/pokemonNames';
 
@@ -20,8 +20,9 @@ const StatusMaster = lazy(() => import('./components/StatusMaster'));
 const ItemGuide = lazy(() => import('./components/ItemGuide'));
 const SpeedControlMaster = lazy(() => import('./components/SpeedControlMaster'));
 const EVOptimizer = lazy(() => import('./components/EVOptimizer'));
+const RentalLibrary = lazy(() => import('./components/RentalLibrary'));
 
-type View = 'home' | 'mbti' | 'speed' | 'damage' | 'matchup' | 'coverage' | 'tiers' | 'priority' | 'counter' | 'settings' | 'log' | 'partnership' | 'heatmap' | 'matrix' | 'status' | 'items' | 'control' | 'ev';
+type View = 'home' | 'mbti' | 'speed' | 'damage' | 'matchup' | 'coverage' | 'tiers' | 'priority' | 'counter' | 'settings' | 'log' | 'partnership' | 'heatmap' | 'matrix' | 'status' | 'items' | 'control' | 'ev' | 'rental';
 
 const themes: Record<string, any> = {
   pikachu: { bg: '#222222' },
@@ -31,8 +32,8 @@ const themes: Record<string, any> = {
 };
 
 const tips = [
-  "노력치 최적화기를 사용해 낭비되는 수치 없이 완벽한 샘플을 설계하세요.",
-  "데미지 계산기에서 명중률을 고려한 기대 데미지를 확인하는 습관을 들이세요.",
+  "렌탈 라이브러리를 통해 상위 랭커들의 파티를 즉시 복사해서 사용해 보세요.",
+  "데미지 계산기 하단의 히트맵은 현재 기술 배치의 취약점을 한눈에 보여줍니다.",
   "랭크 변화(+2)는 화력을 2배로 올리는 강력한 스윕 기회입니다.",
   "테라스탈은 방어뿐만 아니라 공격 STAB 배율(2.0x)을 극대화하는 용도로도 쓰입니다.",
 ];
@@ -111,6 +112,7 @@ const App: React.FC = () => {
             case 'items': return <ItemGuide onBack={() => setView('home')} />;
             case 'control': return <SpeedControlMaster onBack={() => setView('home')} />;
             case 'ev': return <EVOptimizer onBack={() => setView('home')} />;
+            case 'rental': return <RentalLibrary onBack={() => setView('home')} />;
             default:
               return (
                 <div className="w-full max-w-7xl animate-in fade-in duration-500 pb-20">
@@ -119,13 +121,13 @@ const App: React.FC = () => {
                        <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-6 flex items-start gap-4 shadow-xl relative overflow-hidden">
                           <div className="bg-poke-yellow p-3 rounded-2xl text-poke-dark shadow-lg shrink-0 z-10"><Info size={24} /></div>
                           <div className="z-10">
-                            <h3 className="text-sm font-black uppercase text-poke-yellow mb-1 italic">Zenith Zenith Insights</h3>
+                            <h3 className="text-sm font-black uppercase text-poke-yellow mb-1 italic tracking-widest">Apex Master Edition</h3>
                             <p className="text-lg font-bold text-gray-200 leading-snug">"{tips[tipIndex]}"</p>
                           </div>
                           <div className="absolute top-0 right-0 p-4 opacity-5 rotate-12"><Trophy size={100} /></div>
                        </div>
                        <div className="bg-white/5 backdrop-blur-md border-2 border-white/10 rounded-3xl p-6 shadow-xl">
-                          <h3 className="text-xs font-black uppercase text-poke-red mb-4 tracking-widest flex items-center gap-2 italic"><TrendingUp size={16}/> World Meta Series 19</h3>
+                          <h3 className="text-xs font-black uppercase text-poke-red mb-4 tracking-widest flex items-center gap-2 italic"><TrendingUp size={16}/> Usage Stats Trends</h3>
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                              {usageStats.slice(0, 5).map(p => (<div key={p.rank} className="bg-poke-dark/50 p-2 rounded-xl border border-white/5 flex flex-col items-center hover:scale-105 transition-transform cursor-pointer"><span className="text-[8px] font-black text-poke-yellow uppercase">Rank {p.rank}</span><span className="text-[10px] font-bold text-white truncate w-full text-center">{p.koName}</span></div>))}
                           </div>
@@ -136,22 +138,23 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-6">
+                  {/* Ultimate 6x3 Grid (18 Tools) */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4 lg:gap-6">
                     <MenuButton onClick={() => handleNav('mbti')} icon="🐾" title="성향 테스트" color="border-poke-yellow" label="MBTI" />
                     <MenuButton onClick={() => handleNav('speed')} icon="⚡" title="스피드 계산" color="border-poke-red" label="SPEED" />
                     <MenuButton onClick={() => handleNav('damage')} icon="⚔️" title="데미지 시뮬" color="border-poke-blue" label="DAMAGE" />
                     <MenuButton onClick={() => handleNav('matrix')} icon="🥊" title="배틀 매트릭스" color="border-red-500" label="MATRIX" />
-                    
                     <MenuButton onClick={() => handleNav('matchup')} icon="🛡️" title="타입 상성" color="border-green-500" label="TYPES" />
+                    <MenuButton onClick={() => handleNav('rental')} icon={<Library size={48}/>} title="렌탈 라이브러리" color="border-violet-500" label="RENTAL" />
+                    
                     <MenuButton onClick={() => handleNav('coverage')} icon="📊" title="파티 분석" color="border-purple-500" label="TEAM" />
                     <MenuButton onClick={() => handleNav('tiers')} icon="🏁" title="스피드 티어" color="border-orange-500" label="TIERS" />
                     <MenuButton onClick={() => handleNav('heatmap')} icon="🗺️" title="견제 분석" color="border-orange-400" label="HEATMAP" />
-                    
-                    <MenuButton onClick={() => handleNav('ev')} icon={<FlaskConical size={48}/>} title="노력치 설계" color="border-emerald-500" label="EV OPT" />
                     <MenuButton onClick={() => handleNav('partnership')} icon="🤝" title="팀 빌딩" color="border-indigo-500" label="PARTNER" />
+                    <MenuButton onClick={() => handleNav('ev')} icon={<FlaskConical size={48}/>} title="노력치 설계" color="border-emerald-500" label="EV OPT" />
                     <MenuButton onClick={() => handleNav('control')} icon={<Wind size={48}/>} title="스피드 조절" color="border-cyan-400" label="CONTROL" />
-                    <MenuButton onClick={() => handleNav('priority')} icon="🚀" title="우선도 가이드" color="border-cyan-500" label="PRIORITY" />
                     
+                    <MenuButton onClick={() => handleNav('priority')} icon="🚀" title="우선도 가이드" color="border-cyan-500" label="PRIORITY" />
                     <MenuButton onClick={() => handleNav('counter')} icon="🎯" title="카운터 분석" color="border-pink-500" label="COUNTER" />
                     <MenuButton onClick={() => handleNav('status')} icon={<Thermometer size={48}/>} title="상태 이상" color="border-red-400" label="STATUS" />
                     <MenuButton onClick={() => handleNav('items')} icon={<ShoppingBag size={48}/>} title="도구 백과" color="border-indigo-400" label="ITEMS" />
@@ -221,7 +224,7 @@ const App: React.FC = () => {
       </nav>
 
       <footer className="bg-poke-dark p-6 text-center border-t-2 border-white/10 pb-24 md:pb-6">
-        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest italic tracking-[0.2em]">Pokémon Champions v17.0 Zenith Edition</p>
+        <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest italic tracking-[0.2em]">Pokémon Champions v18.0 Apex Champion Edition</p>
       </footer>
     </div>
   );
@@ -229,10 +232,10 @@ const App: React.FC = () => {
 
 const MenuButton = ({ onClick, icon, title, color, label }: any) => (
   <button onClick={onClick} className={`group relative bg-white rounded-3xl p-4 md:p-6 border-4 md:border-8 ${color} shadow-[0_6px_0_0_rgba(0,0,0,0.1)] hover:translate-y-1 hover:shadow-none transition-all duration-200 cursor-pointer overflow-hidden`}>
-    <div className="flex flex-col items-center gap-1.5 md:gap-3 text-poke-dark">
-      <div className="text-3xl md:text-5xl group-hover:scale-110 transition-transform">{typeof icon === 'string' ? icon : React.cloneElement(icon as React.ReactElement, { size: 48 })}</div>
-      <h2 className="text-[10px] md:text-sm font-black uppercase tracking-tighter leading-tight text-center">{title}</h2>
-      <div className="mt-1 px-2 py-0.5 bg-poke-dark text-white font-black rounded-full text-[7px] md:text-[8px] uppercase italic">{label}</div>
+    <div className="flex flex-col items-center gap-1 md:gap-2.5 text-poke-dark">
+      <div className="text-2xl md:text-5xl group-hover:scale-110 transition-transform">{typeof icon === 'string' ? icon : React.cloneElement(icon as React.ReactElement, { size: 48 })}</div>
+      <h2 className="text-[9px] md:text-xs font-black uppercase tracking-tighter leading-tight text-center">{title}</h2>
+      <div className="mt-1 px-1.5 py-0.5 bg-poke-dark text-white font-black rounded-full text-[6px] md:text-[8px] uppercase italic leading-none">{label}</div>
     </div>
   </button>
 );
