@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { ListOrdered, ChevronLeft, Search, Zap, Star } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ListOrdered, ChevronLeft, Search, Zap, Loader2 } from 'lucide-react';
+import axios from 'axios';
 
 interface SpeedTiersProps {
   onBack: () => void;
@@ -10,28 +11,45 @@ interface TierEntry {
   name: string;
   koName: string;
   condition: string;
+  sprite?: string;
 }
 
-const speedTiers: TierEntry[] = [
+const initialTiers: TierEntry[] = [
   { speed: 300, name: 'Regieleki', koName: '레지에레키', condition: '최속 보정' },
   { speed: 225, name: 'Dragapult', koName: '드래펄트', condition: '최속 + 구애스카프' },
   { speed: 201, name: 'Garchomp', koName: '한카리아스', condition: '최속 + 구애스카프' },
   { speed: 200, name: 'Flutter Mane', koName: '날개치는머리', condition: '최속 보정' },
-  { speed: 200, name: 'Aerodactyl', koName: '프테라', condition: '최속 보정' },
   { speed: 178, name: 'Garchomp', koName: '한카리아스', condition: '최속 보정' },
-  { speed: 167, name: 'Urshifu', koName: '우라오스', condition: '최속 보정' },
+  { speed: 167, name: 'Urshifu-rapid-strike', koName: '연격 우라오스', condition: '최속 보정' },
   { speed: 156, name: 'Gholdengo', koName: '타부자고', condition: '최속 보정' },
   { speed: 154, name: 'Dragonite', koName: '망나뇽', condition: '최속 보정' },
   { speed: 122, name: 'Incineroar', koName: '어흥염', condition: '준속 보정' },
   { speed: 100, name: 'Snorlax', koName: '잠만보', condition: '무보정' },
+  { speed: 80, name: 'Pelipper', koName: '패리퍼', condition: '무보정' },
   { speed: 50, name: 'Amoonguss', koName: '뽀록나', condition: '최저속 (0 IV)' },
 ];
 
 const SpeedTiers: React.FC<SpeedTiersProps> = ({ onBack }) => {
+  const [tiers, setTiers] = useState<TierEntry[]>(initialTiers);
   const [searchTerm, setSearchTerm] = useState('');
   const [userSpeed, setUserSpeed] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredTiers = speedTiers.filter(t => 
+  useEffect(() => {
+    const fetchSprites = async () => {
+      const updated = await Promise.all(tiers.map(async (t) => {
+        try {
+          const res = await axios.get(`https://pokeapi.co/api/v2/pokemon/${t.name.toLowerCase().replace(' ', '-')}`);
+          return { ...t, sprite: res.data.sprites.front_default };
+        } catch (e) { return t; }
+      }));
+      setTiers(updated);
+      setIsLoading(false);
+    };
+    fetchSprites();
+  }, []);
+
+  const filteredTiers = tiers.filter(t => 
     t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     t.koName.includes(searchTerm)
   ).sort((a, b) => b.speed - a.speed);
@@ -47,7 +65,7 @@ const SpeedTiers: React.FC<SpeedTiersProps> = ({ onBack }) => {
           <div className="bg-poke-red p-3 rounded-2xl text-white shadow-lg"><ListOrdered size={32} /></div>
           <div>
             <h2 className="text-3xl font-black uppercase tracking-tighter">스피드 티어표</h2>
-            <p className="text-gray-500 font-bold">누가 누구보다 빠를까요?</p>
+            <p className="text-gray-500 font-bold italic">Visual Reference Active!</p>
           </div>
         </div>
 
@@ -63,43 +81,42 @@ const SpeedTiers: React.FC<SpeedTiersProps> = ({ onBack }) => {
               <label className="text-xs font-black uppercase text-gray-400 mb-1 block italic">내 포켓몬 스피드 비교</label>
               <div className="relative">
                  <Zap className="absolute left-3 top-1/2 -translate-y-1/2 text-poke-yellow" size={16} />
-                 <input type="number" placeholder="내 스피드 입력..." value={userSpeed || ''} onChange={(e) => setUserSpeed(Number(e.target.value))} className="w-full bg-gray-50 border-2 border-gray-100 p-2 pl-10 rounded-xl font-bold focus:border-poke-red outline-none" />
+                 <input type="number" placeholder="수치 입력..." value={userSpeed || ''} onChange={(e) => setUserSpeed(Number(e.target.value))} className="w-full bg-gray-50 border-2 border-gray-100 p-2 pl-10 rounded-xl font-bold focus:border-poke-red outline-none" />
               </div>
            </div>
         </div>
 
-        <div className="space-y-2 overflow-y-auto max-h-[500px] pr-2">
-           {filteredTiers.map((tier, idx) => {
+        <div className="space-y-3 overflow-y-auto max-h-[500px] pr-2">
+           {isLoading && (
+              <div className="flex flex-col items-center py-20 gap-4">
+                 <Loader2 size={48} className="animate-spin text-poke-red" />
+                 <p className="font-black text-gray-300 uppercase italic">데이터 로딩 중...</p>
+              </div>
+           )}
+           {!isLoading && filteredTiers.map((tier, idx) => {
               const isFaster = userSpeed > tier.speed;
               return (
-                 <div key={idx} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isFaster ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
+                 <div key={idx} className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isFaster ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'} hover:scale-[1.01]`}>
                     <div className="flex items-center gap-4">
-                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg shadow-sm ${isFaster ? 'bg-green-500 text-white' : 'bg-poke-dark text-white'}`}>
-                          {tier.speed}
+                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-lg shadow-sm overflow-hidden ${isFaster ? 'bg-green-500 text-white' : 'bg-poke-dark text-white'}`}>
+                          {tier.sprite ? <img src={tier.sprite} className="w-12 h-12 object-contain" /> : tier.speed}
                        </div>
                        <div>
                           <div className="flex items-center gap-2">
                              <span className="font-black text-sm">{tier.koName}</span>
-                             <span className="text-[10px] text-gray-400 uppercase">{tier.name}</span>
+                             <span className="text-[10px] text-gray-400 uppercase italic font-bold">Speed {tier.speed}</span>
                           </div>
                           <p className="text-[10px] font-bold text-gray-400 italic">{tier.condition}</p>
                        </div>
                     </div>
                     {userSpeed > 0 && (
-                       <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase italic ${isFaster ? 'bg-green-200 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                       <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic ${isFaster ? 'bg-green-200 text-green-700 shadow-sm' : 'bg-red-100 text-red-600'}`}>
                           {isFaster ? 'Outspeed!' : 'Slower'}
                        </div>
                     )}
                  </div>
               );
            })}
-           {filteredTiers.length === 0 && <p className="text-center py-10 text-gray-400 font-bold italic">검색 결과가 없습니다.</p>}
-        </div>
-
-        <div className="mt-8 p-4 bg-yellow-50 rounded-2xl border-2 border-dashed border-poke-yellow/20">
-           <p className="text-[10px] font-bold text-gray-600">
-             * 위 수치는 레벨 50 기준 실전 보정치를 반영한 통상적인 스피드 수치입니다.
-           </p>
         </div>
       </div>
     </div>

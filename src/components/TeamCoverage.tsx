@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ChevronLeft, Search, Loader2, Plus, X, AlertTriangle, Share2, Shield, Swords } from 'lucide-react';
+import { Users, ChevronLeft, Search, Loader2, Plus, X, AlertTriangle, Share2, FileDown } from 'lucide-react';
 import axios from 'axios';
 import { pokemonNameMap } from '../data/pokemonNames';
 
@@ -48,30 +48,19 @@ const typeMatchups: Record<string, { double: string[], half: string[], zero: str
   'Dark': { double: ['Fighting', 'Bug', 'Fairy'], half: ['Ghost', 'Dark'], zero: ['Psychic'] },
 };
 
-// Inverse map for offensive checking: Which types are weak to this type?
-const offensiveMatchups: Record<string, string[]> = {};
-types.forEach(t => {
-  offensiveMatchups[t.name] = [];
-  Object.entries(typeMatchups).forEach(([attacker, targetData]) => {
-    if (targetData.double.includes(t.name)) offensiveMatchups[t.name].push(attacker);
-  });
-});
-
 const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'defense' | 'offense'>('defense');
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
 
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.startsWith('#team=')) {
-      try {
-        const encoded = hash.split('#team=')[1];
-        setTeam(JSON.parse(atob(encoded)));
-        window.history.replaceState(null, '', window.location.pathname);
-      } catch (e) { console.error(e); }
+      try { setTeam(JSON.parse(atob(hash.split('#team=')[1]))); window.history.replaceState(null, '', window.location.pathname); } catch (e) {}
     } else {
       const saved = localStorage.getItem('poke_team');
       if (saved) setTeam(JSON.parse(saved));
@@ -103,17 +92,28 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
     setSearchTerm('');
     setSuggestions([]);
     try {
-      const res = await axios.get(`https://pokeapi.co/api/v2/pokemon/${p.name}`);
+      const res = await axios.get(`https://pokeapi.co/api/v2/pokemon/${p.name.toLowerCase()}`);
       const newMember: TeamMember = {
-        id: Date.now().toString(),
+        id: Date.now().toString() + Math.random(),
         name: p.name,
-        koName: p.koName,
+        koName: p.koName || Object.keys(pokemonNameMap).find(key => pokemonNameMap[key] === p.name.toLowerCase()),
         types: res.data.types.map((t: any) => t.type.name.charAt(0).toUpperCase() + t.type.name.slice(1)),
         sprite: res.data.sprites.front_default
       };
-      setTeam([...team, newMember]);
-    } catch (e) { alert('실패'); }
+      setTeam(prev => [...prev, newMember].slice(0, 6));
+    } catch (e) { console.error(e); }
     finally { setIsSearching(false); }
+  };
+
+  const handleImport = async () => {
+    const names = importText.split('\n').filter(line => line.includes('@') || line.trim()).map(line => line.split(' ')[0].split('(')[0].trim());
+    const uniqueNames = Array.from(new Set(names)).slice(0, 6);
+    setTeam([]);
+    setShowImport(false);
+    for (const name of uniqueNames) {
+       await addPokemon({ name });
+    }
+    setImportText('');
   };
 
   const removePokemon = (id: string) => setTeam(team.filter(m => m.id !== id));
@@ -146,9 +146,7 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
       member.types.forEach(mType => {
         const data = typeMatchups[mType];
         if (!data) return;
-        data.double.forEach(targetType => {
-           coverage[targetType]++;
-        });
+        data.double.forEach(targetType => coverage[targetType]++);
       });
     });
     return coverage;
@@ -168,30 +166,41 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center mb-8">
         <button onClick={onBack} className="flex items-center gap-2 text-white/70 hover:text-white transition-colors font-bold uppercase"><ChevronLeft size={20} /> 메뉴</button>
-        {team.length > 0 && (
-          <button onClick={shareTeam} className="bg-poke-blue text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2"><Share2 size={16} /> 공유</button>
-        )}
+        <div className="flex gap-2">
+          <button onClick={() => setShowImport(true)} className="bg-gray-700 text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 hover:bg-gray-600 transition-colors shadow-lg"><FileDown size={16} /> Import</button>
+          {team.length > 0 && <button onClick={shareTeam} className="bg-poke-blue text-white px-4 py-2 rounded-full font-black text-xs uppercase italic flex items-center gap-2 hover:scale-105 transition-transform shadow-lg"><Share2 size={16} /> 공유</button>}
+        </div>
       </div>
+
+      {showImport && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white rounded-3xl p-8 w-full max-w-md border-8 border-poke-red">
+               <h3 className="text-xl font-black text-poke-dark uppercase italic mb-4">Showdown Import</h3>
+               <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="Showdown 텍스트를 붙여넣으세요..." className="w-full h-40 bg-gray-100 p-4 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-poke-red transition-all mb-4" />
+               <div className="flex gap-2">
+                  <button onClick={handleImport} className="flex-1 py-3 bg-poke-red text-white font-black rounded-xl uppercase italic shadow-lg">가져오기</button>
+                  <button onClick={() => setShowImport(false)} className="px-6 py-3 bg-gray-200 text-gray-500 font-black rounded-xl uppercase italic">취소</button>
+               </div>
+            </div>
+         </div>
+      )}
 
       <div className="bg-white rounded-3xl p-8 border-8 border-poke-red shadow-[0_12px_0_0_rgba(238,21,21,1)] text-poke-dark">
         <div className="flex items-center gap-4 mb-8 border-b-4 border-gray-100 pb-4">
-          <div className="bg-poke-red p-3 rounded-2xl text-white"><Users size={32} /></div>
-          <div>
-             <h2 className="text-3xl font-black uppercase tracking-tighter">파티 분석기</h2>
-             <p className="text-gray-500 font-bold italic">Defensive & Offensive Insight</p>
-          </div>
+          <div className="bg-poke-red p-3 rounded-2xl text-white shadow-lg"><Users size={32} /></div>
+          <div><h2 className="text-3xl font-black uppercase tracking-tighter">파티 분석기</h2><p className="text-gray-500 font-bold italic">Persistence & Showdown Import Active!</p></div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
           <div className="lg:col-span-8">
              <div className="relative mb-6">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input type="text" placeholder="포켓몬 검색 (자동 저장)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-50 border-4 border-transparent focus:border-poke-red outline-none p-4 pl-12 rounded-2xl font-bold transition-all" />
+                <input type="text" placeholder="포켓몬 검색 (자동 저장)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-50 border-4 border-transparent focus:border-poke-red outline-none p-4 pl-12 rounded-2xl font-bold transition-all shadow-inner" />
                 {isSearching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-poke-red" size={20} />}
                 {suggestions.length > 0 && (
-                  <div className="absolute z-30 w-full mt-2 bg-white border-4 border-poke-red rounded-xl shadow-2xl overflow-hidden">
+                  <div className="absolute z-30 w-full mt-2 bg-white border-4 border-poke-red rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-top-2">
                     {suggestions.map(p => (
-                      <button key={p.name} onClick={() => addPokemon(p)} className="w-full p-4 text-left hover:bg-gray-50 font-bold capitalize flex justify-between border-b border-gray-100">
+                      <button key={p.name} onClick={() => addPokemon(p)} className="w-full p-4 text-left hover:bg-yellow-50 font-bold capitalize flex justify-between border-b border-gray-100">
                         <span>{p.koName || p.name}</span><Plus size={20} className="text-poke-red" />
                       </button>
                     ))}
@@ -201,8 +210,8 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
 
              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {team.map(m => (
-                   <div key={m.id} className="relative bg-gray-50 p-4 rounded-2xl border-2 border-gray-100 flex flex-col items-center">
-                      <button onClick={() => removePokemon(m.id)} className="absolute -top-2 -right-2 bg-white text-gray-400 rounded-full p-1 shadow-md border border-gray-100"><X size={16} /></button>
+                   <div key={m.id} className="relative bg-gray-50 p-4 rounded-2xl border-2 border-gray-100 flex flex-col items-center group animate-in zoom-in">
+                      <button onClick={() => removePokemon(m.id)} className="absolute -top-2 -right-2 bg-white text-gray-400 hover:text-poke-red rounded-full p-1 shadow-md border border-gray-100 transition-colors z-10"><X size={16} /></button>
                       <img src={m.sprite} className="w-20 h-20 object-contain mb-2" />
                       <span className="font-black text-[10px] text-center capitalize">{m.koName || m.name}</span>
                    </div>
@@ -215,39 +224,30 @@ const TeamCoverage: React.FC<TeamCoverageProps> = ({ onBack }) => {
 
           <div className="lg:col-span-4 bg-gray-50 rounded-2xl p-6 border-2 border-gray-100">
              <div className="flex gap-2 mb-6">
-                <button onClick={() => setActiveTab('defense')} className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase transition-all ${activeTab === 'defense' ? 'bg-poke-red text-white shadow-md scale-105' : 'bg-white text-gray-400 border border-gray-200'}`}>방어 상성</button>
-                <button onClick={() => setActiveTab('offense')} className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase transition-all ${activeTab === 'offense' ? 'bg-poke-blue text-white shadow-md scale-105' : 'bg-white text-gray-400 border border-gray-200'}`}>공격 상성</button>
+                <button onClick={() => setActiveTab('defense')} className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase transition-all ${activeTab === 'defense' ? 'bg-poke-red text-white shadow-md scale-105' : 'bg-white text-gray-400 border border-gray-200'}`}>방어</button>
+                <button onClick={() => setActiveTab('offense')} className={`flex-1 py-2 rounded-xl font-black text-[10px] uppercase transition-all ${activeTab === 'offense' ? 'bg-poke-blue text-white shadow-md scale-105' : 'bg-white text-gray-400 border border-gray-200'}`}>공격</button>
              </div>
-
              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
                 {types.map(t => {
                    const val = activeTab === 'defense' ? defResults.weaknesses[t.name] : offResults[t.name];
                    const resVal = activeTab === 'defense' ? defResults.resistances[t.name] : 0;
                    if (val === 0 && resVal === 0) return null;
                    return (
-                      <div key={t.name} className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                      <div key={t.name} className="bg-white p-2 rounded-xl border border-gray-100 flex items-center justify-between">
                          <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }}></span>
-                            <span className="font-black text-[10px] uppercase italic">{t.ko}</span>
+                            <span className="font-black text-[10px] uppercase">{t.ko}</span>
                          </div>
                          <div className="flex flex-col items-end">
-                            <span className={`text-[9px] font-black ${activeTab === 'defense' ? (val >= 3 ? 'text-red-500 animate-pulse' : 'text-gray-400') : (val > 0 ? 'text-blue-500' : 'text-gray-300')}`}>
-                               {activeTab === 'defense' ? `약점: ${val}` : `견제: ${val}`}
-                            </span>
+                            <span className={`text-[9px] font-black ${activeTab === 'defense' ? (val >= 3 ? 'text-red-500 animate-pulse' : 'text-gray-400') : (val > 0 ? 'text-blue-500' : 'text-gray-300')}`}>{activeTab === 'defense' ? `약점: ${val}` : `견제: ${val}`}</span>
                             {activeTab === 'defense' && <span className="text-[9px] font-black text-green-500">반감: {resVal}</span>}
                          </div>
                       </div>
                    );
                 })}
-                {team.length === 0 && <p className="text-center py-10 text-xs text-gray-400 italic">파티를 구성하면 <br/>데이터가 나타납니다.</p>}
+                {team.length === 0 && <p className="text-center py-10 text-xs text-gray-400 italic">파티를 구성하세요.</p>}
              </div>
           </div>
-        </div>
-
-        <div className="p-4 bg-yellow-50 rounded-2xl border-2 border-dashed border-poke-yellow/30">
-           <p className="text-xs font-bold text-gray-600">
-             {activeTab === 'defense' ? "💡 팁: 한 타입에 약점이 3개 이상이면 교체 플레이가 어렵습니다." : "💡 팁: 모든 타입을 최소 1마리 이상의 자속 기술로 견제할 수 있는 것이 좋습니다."}
-           </p>
         </div>
       </div>
     </div>
